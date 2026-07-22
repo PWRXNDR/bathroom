@@ -1,0 +1,25 @@
+{
+  "name": "bathroom-webgpu",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "analyze:model": "node scripts/analyze-model.mjs"
+  },
+  "dependencies": {
+    "stats.js": "0.17.0",
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "@types/stats.js": "0.17.4",
+    "@types/three": "0.185.0",
+    "typescript": "5.9.3",
+    "vite": "8.1.5"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

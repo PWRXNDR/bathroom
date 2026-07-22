@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#080808" />
+    <link rel="icon" href="data:," />
+    <title>Bathroom WebGPU</title>
+  </head>
+  <body>
+    <canvas class="experience"></canvas>
+    <div class="preloader" aria-hidden="true">
+      <svg class="preloader__ring" viewBox="0 0 120 120">
+        <circle class="preloader__track" cx="60" cy="60" r="52" />
+        <circle class="preloader__value" cx="60" cy="60" r="52" />
+      </svg>
+      <span class="preloader__number">0</span>
+    </div>
+    <script type="module" src="./script.ts"></script>
+  </body>
+</html>
