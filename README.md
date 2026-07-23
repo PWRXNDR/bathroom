@@ -1,193 +1,178 @@
 # Bathroom WebGPU
 
-Photorealistic bathroom viewer built with vanilla Three.js, TypeScript, Vite, and `WebGPURenderer`. There is no React, R3F, Babylon.js, or WebGL fallback.
+Фотореалистичная сцена ванной комнаты на vanilla Three.js, TypeScript и `WebGPURenderer`. Основной акцент был на подготовке тяжёлой исходной модели, корректных PBR материалах, освещении и стабильной связке экранных эффектов.
 
-The visual target is [Bathroom Interior by Oguz Kaya](https://sketchfab.com/3d-models/bathroom-interior-68be8975cca1481c85c20b590e81c6a6). The application starts from the reference camera inside the room, but navigation is not locked to a height, axis, or room boundary. Left- or middle-drag orbits freely, right-drag pans in screen space, the wheel dollies, and touch uses one-finger orbit plus two-finger dolly/pan.
+## Ссылки
 
-## Run locally
+- Репозиторий: [github.com/PWRXNDR/bathroom](https://github.com/PWRXNDR/bathroom)
+- Демо: https://bathroom.dubralex.com/
 
-Requirements: Node.js 22.12 or newer and a browser with WebGPU enabled.
+## Запуск
 
-```powershell
+Требуется Node.js 22.12 или новее.
+
+```bash
 npm install
 npm run dev
 ```
 
-Production verification:
+Production сборка и локальная проверка:
 
-```powershell
+```bash
 npm run build
 npm run preview
 ```
 
-The build output is `dist/`.
+Сборка не использует WebGL fallback. Если браузер или GPU не поддерживает WebGPU, приложение показывает экран ошибки вместо запуска другой версии рендера.
 
-## Vercel
+## Соответствие заданию
 
-`vercel.json` already declares the Vite build command, `dist` output directory, and SPA rewrite. Import the repository in Vercel or run:
+| Требование | Статус | Реализация |
+| --- | --- | --- |
+| Three.js + TypeScript + WebGPU | Выполнено | Three.js r185, Vite, TypeScript, только `WebGPURenderer` |
+| HDRI для IBL | Выполнено | HDR окружение загружается через `RGBELoader`, затем подготавливается через PMREM |
+| Прямые источники света | Выполнено | Три настроенных `SpotLight` с мягкими тенями и один слабый ambient source |
+| SSAO | Выполнено | GTAO из WebGPU TSL используется как реализация screen space ambient occlusion |
+| SSR | Выполнено | Экранные отражения учитывают depth, normal, roughness, metalness и окружение |
+| SSGI | Выполнено | Диффузный screen space bounce с temporal filtering |
+| Tone Mapping | Выполнено | ACES, exposure 0.73 |
+| Минимум 30 FPS | Выполнено на тестовом ноутбуке | 45 FPS во время взаимодействия, 30 FPS в idle режиме |
+| Готовность к Vercel | Выполнено | Есть `vercel.json`, production команда и SPA rewrite |
+| Ссылка на опубликованное демо | Нужна финальная проверка | URL не сохранён в локальном репозитории, его нужно добавить выше перед отправкой |
 
-```powershell
-npx vercel
-```
+## Архитектура
 
-WebGPU requires a secure context in production; Vercel provides HTTPS automatically.
+Структура специально оставлена небольшой:
+
+- `App.ts` управляет загрузкой, жизненным циклом и частотой кадров.
+- `Renderer.ts` инициализирует WebGPU, цветовое пространство, tone mapping и тени.
+- `World.ts` собирает сцену, HDRI и источники света.
+- `Bathroom.ts` загружает две оптимизированные GLB модели и чинит материалы после конвертации.
+- `PostProcessing.ts` содержит G-buffer и весь render pipeline.
+- `UI.ts` оставляет только три панели `stats.js`: FPS, CPU frame time и render scale.
+- `Preloader.ts` показывает круг загрузки без текста и дополнительного интерфейса.
+
+Панель настройки, выбор материалов мышью, light gizmos, экспорт параметров и экспериментальные quality branches удалены из финальной версии. Активные значения из последнего утверждённого пресета зафиксированы прямо рядом с местом использования, поэтому итоговая картинка не зависит от скрытого состояния GUI.
 
 ## Render pipeline
 
-The active order is:
+Пайплайн собирается через Three.js `RenderPipeline` и TSL в следующем порядке:
 
-```text
-opaque MRT G-buffer
-  -> temporally filtered GTAO
-  -> shadowed + IBL beauty render
-  -> deployed-compatible SSR + SSGI
-  -> linear HDR composite and subtle saturation correction
-  -> reversible max-RGB tone compression
-  -> TRAA
-  -> RCAS-style sharpening in the bounded domain
-  -> inverse tone compression with a radiance safety clamp
-  -> AgX tone mapping
-  -> sRGB output
-```
+1. Opaque G-buffer: normal, diffuse, metalness, roughness, dielectric response, clearcoat, depth и velocity.
+2. GTAO: ambient occlusion из depth и normal, применяется только к ambient составляющей beauty pass.
+3. Beauty pass: PBR освещение от HDRI и трёх spot lights с тенями.
+4. SSR: отражения из текущего кадра с разной обработкой металлов, зеркала и rough dielectric поверхностей.
+5. SSGI: короткий диффузный перенос света между близкими поверхностями.
+6. HDR composite: beauty, SSR и SSGI объединяются в linear HDR, затем применяется saturation.
+7. Reversible HDR compression: яркие значения сжимаются перед temporal pass.
+8. TAA: стабилизирует шум и мерцание SSR и SSGI.
+9. Sharpen и обратное восстановление HDR диапазона.
+10. ACES tone mapping и sRGB output.
 
-The MRT stores view normal, diffuse color, metalness, roughness, depth, and velocity. Deterministic SSR follows the deployed app's material mask: authored metalness remains dominant, while dielectric reflections use a roughness-gated 4% Fresnel weight. Matte walls therefore do not inherit the same reflection level as polished stone or metal.
+Bloom и depth of field в финальной версии не используются. Они не требовались заданием, а bloom заметно менял характер светильников и добавлял стоимость кадра.
 
-TRAA is included because SSR and SSGI otherwise shimmer during camera movement. Before TRAA, HDR color is reversibly compressed with `C / (1 + max(C))`; sharpening also runs in this bounded domain, then `C' / (1 - max(C'))` restores linear HDR. A hue-preserving `0.98` peak guard limits reconstructed radiance to `49`, suppressing isolated fireflies without clipping the beauty pass before temporal filtering. AgX cannot be inverted exactly because it clamps its input and output, so it remains the single final display tone map. Bloom and DOF are intentionally omitted.
+## Что сработало
 
-The wall and vanity mirrors use a dark, low-roughness PBR/SSR response with an explicit low-strength PMREM map. There is no camera-following planar proxy, captured environment image, or extra mirror scene render, so the response stays attached to the surfaces while the camera moves and does not double the scene cost.
+- HDRI даёт стабильную базу для керамики, хрома, стекла и остальных отражающих материалов. Прямые источники света отвечают за форму, локальные акценты и тени.
+- GTAO хорошо подчёркивает стыки, пространство под тумбой и мелкие контакты, при этом не затемняет уже освещённые области целиком.
+- SSR особенно заметен на зеркале, металле и глянцевой плитке. Для шероховатых неметаллических поверхностей отражение дополнительно смешивается с albedo, поэтому оно выглядит частью материала, а не отдельной глянцевой плёнкой.
+- SSGI добавляет мягкий локальный перенос цвета между близкими поверхностями, например рядом с сантехникой и полотенцем.
+- TAA оказался оправданным дополнением. Без temporal accumulation SSR и SSGI заметно шумели при движении камеры.
+- Камера свободно вращается, двигается и масштабируется через `OrbitControls`, стартовая позиция сразу находится внутри ванной.
+- Частота рендера ограничена до 45 FPS во время взаимодействия и до 30 FPS после паузы. Это сохраняет требуемую плавность и заметно уменьшает нагрев ноутбука.
 
-## Lighting and materials
+## Что не сработало и почему
 
-- IBL: [Studio Small 08](https://polyhaven.com/a/studio_small_08), 1K HDR, PMREM-filtered. Its neutral, low-contrast softboxes avoid the black grazing reflections produced by the previous high-contrast studio HDRI.
-- Direct lighting: warm `#FFF7DB / #FEEED7 / #FFF7EB` spots with intensities `61.4 / 4.9 / 30`.
-- Shadows: all three spots cast cached 1024 px shadows with the independent bias, radius, and strength values in the supplied tuning snapshot.
-- Ambient fill: a low neutral fill reproduces the reference viewer's background ambient contribution without erasing contact shadows.
-- Tone mapping: AgX, exposure `0.66`, then sRGB encoding.
-- Glass: the shower material matches the `Glass_Pure` settings from `bathroom2`: linear color `0.54901999`, roughness `0.41904891`, opacity `0.02285721`, `IOR = 1000`, specular intensity `1`, no transmission/thickness/clearcoat, double-sided rendering, and no depth write or cast shadow.
-- Imported material repair: the source conversion assigned `IOR = 1000` to 76 of 78 materials. Runtime normalization restores ordinary dielectrics to `IOR = 1.5`; named polished metals use roughness `0.02` and mirrors use `0.005`. Reflective categories bind the PMREM texture directly so their individual `envMapIntensity` values actually take effect in Three.js r185; ordinary walls remain controlled by the global scene environment.
-- Texture filtering: color and material maps use renderer-supported anisotropy capped at 8, preserving wall and floor detail at oblique camera angles.
-- Color space: base color and emissive textures are sRGB; data textures such as normal, roughness, metalness, and AO must remain linear.
+### Fireflies и порядок TAA
 
-The active spotlight values come from the versioned tuning snapshot supplied for this build:
+Прямое применение финального ACES до TAA с последующим «обратным ACES» было бы математически неверным. ACES включает нелинейное преобразование и clipping, поэтому точно восстановить исходный HDR сигнал после него невозможно.
 
-| Light | Position `(x, y, z)` | Target `(x, y, z)` | Intensity / angle | Shadow `(bias, normal, radius, strength)` |
-|---|---|---|---|---|
-| 1 | `(3.48699, 3.34891, -3.71707)` | `(3.53221, 1.81796, -3.53871)` | `61.4 / 55°` | `-0.0001, 0.004, 2, 0.45` |
-| 2 | `(3.86184, 2.78081, -4.71600)` | `(3.79515, 1.81245, -4.97941)` | `4.9 / 83.4°` | `-0.00032, 0.0142, 3, 0.52` |
-| 3 | `(3.76174, 2.77493, -3.35341)` | `(3.60485, 1.77043, -2.66449)` | `30 / 57.8°` | `-0.0001, 0.004, 2, 0.87` |
+Вместо этого перед TAA используется обратимое сжатие по максимальному RGB каналу. Оно ограничивает слишком яркие выбросы, TAA работает с безопасным диапазоном, после чего HDR восстанавливается и только затем проходит через финальный ACES. Дополнительный peak guard не даёт знаменателю приблизиться к нулю. Это убрало большую часть fireflies без заметного изменения цвета сцены.
 
-## Runtime tuning
+### Зеркало
 
-The `lil-gui` panel exposes the renderer and scene values that materially affect reference matching: all three lights and their shadow settings, ambient/IBL intensity, GTAO (SSAO), SSR, SSGI, TAA, tone mapping, exposure, saturation, sharpening, render scale, quality profile, and camera values. Manual quality edits disable automatic quality switching so the adaptive controller cannot overwrite a value while it is being tuned.
+Настоящее planar reflection требует второго рендера сцены с отражённой камерой. Такой вариант тестировался, но дал слишком высокую нагрузку и более сложное поведение при свободной камере. В финале зеркало является чистым PBR материалом без albedo и normal текстур, а отражение формируется SSR и IBL. Это быстрее, но объекты за пределами экрана не могут появиться в отражении.
 
-`Copy params` writes a versioned JSON snapshot of the current live values to the clipboard. The snapshot includes the runtime model path, camera and controls, renderer/tone mapping, environment, lights, screen-space passes, composite settings, and adaptive-quality state, so a tuned look can be reproduced without transcribing the panel by hand.
+### Шум и temporal artifacts
 
-### 3D light gizmos
+SSR и SSGI работают только с данными текущего экрана. На краях, при disocclusion и быстром движении камеры информации не хватает. TAA уменьшает шум, но может оставить короткий ghost trail. Полностью убрать этот конфликт без более дорогого history rejection и denoiser не получилось.
 
-`Lights > 3D gizmos` controls one shared translation gizmo for the three spotlights. Select a light and choose `Light position` or `Aim target`; dragging the target changes the spotlight direction because Three.js spotlights are target-driven. The light spheres and magenta target markers can also be clicked directly in the viewport to move the gizmo without returning to the panel.
+### Некорректные материалы после экспорта
 
-The selected cone is cyan, unselected cones remain faint, and the displayed cone length is independently adjustable so the real 5.5 m light range does not cover the whole room. OrbitControls are suspended only while an axis is being dragged, static shadows are invalidated as the light moves, and the gizmos can be hidden while judging or capturing the final image. Gizmo selection, handle, size, cone length, and movement snap are included in `Copy params`.
+Часть импортированных материалов содержала экстремальный IOR, неудачные значения roughness и metalness, лишние текстуры или неверную интерпретацию normal map. Из-за этого поверхности становились чёрными, слишком матовыми или пересвеченными. Материалы нормализуются при загрузке, а для визуально важных объектов применяются точечные overrides.
 
-## Adaptive performance
+## Оптимизация модели
 
-The upper-left `stats.js` panels show FPS, CPU frame time, and render scale. `lil-gui` is a DOM tuning panel; no labels, buttons, annotations, or text are rendered inside the 3D scene.
+Подготовка ассетов заняла больше всего времени. Основная проблема была не только в количестве треугольников, но и в тысячах отдельных узлов, повторяющихся картинках, лишних material slots и несовпадающих данных после Blender и glTF конвертации.
 
-- Active interaction: capped at 45 FPS to reduce sustained laptop GPU power while remaining above the 30 FPS requirement.
-- Idle: capped at 30 FPS to reduce heat and power use.
-- Startup quality: high, with adaptive switching disabled by the supplied snapshot. If enabled manually, sustained performance below 28 FPS steps high to balanced and then low; low can recover to balanced above 40 FPS.
-- GTAO and SSR run at reduced resolution. SSGI scales through slice and step counts; it does not expose an independent resolution scale in the current Three.js node.
-- High and balanced render scale is `1.25`; low mode uses `0.90`.
-- The mirror remains in the main PBR/SSR render and does not add a planar-reflection scene render.
-- Static shadow maps do not update every frame.
+| Метрика | Исходная ванная | Runtime ванная |
+| --- | ---: | ---: |
+| Размер GLB | 25.93 MiB | 4.95 MiB |
+| Render meshes | 2058 | 77 |
+| Треугольники | 352 610 | 340 149 |
+| Текстуры | 54 | 48 KTX2 |
+| Дубликаты изображений | 5 групп | 0 |
 
-Measured on 23 July 2026 at 1920 x 1080 in Chrome 150:
+Отдельное полотенце уменьшено с 1.47 MiB до 0.24 MiB. Вся runtime сцена содержит около 400 625 треугольников, 78 render meshes и 49 KTX2 текстур.
 
-- CPU: AMD Ryzen 7 250, 8 cores / 16 threads.
-- GPU: NVIDIA GeForce RTX 5060 Laptop GPU; WebGPU reported NVIDIA Blackwell.
-- High render scale: 1.25, native on the test display.
-- Active: 45 FPS target, normally 5-8 ms CPU frame time.
-- Idle: 30 FPS target, normally about 4-6 ms CPU frame time.
+Геометрия сжата Draco, изображения переведены в KTX2 через Khronos KTX-Software. KTX2 уменьшает загрузку и объём данных в GPU памяти, Draco уменьшает сетевой размер геометрии. Повторяющиеся mesh nodes основной комнаты объединены по материалу, полотенце оставлено отдельным ассетом с исходным transform.
 
-These are local measurements, not a guarantee for every device. The stats `MS` panel measures CPU/main-thread frame time, not GPU time. The first uncached WebGPU shader compilation is hidden by the preloader.
+Количество `POSITION` элементов после оптимизации может быть немного больше Blender vertex count. Это ожидаемо: glTF разделяет вершины на UV seams, hard normals, tangents и границах material groups. Такое число нельзя напрямую сравнивать с количеством сваренных вершин в Blender. В данном случае основной выигрыш пришёл от уменьшения draw calls и веса ассетов, а не от агрессивного разрушения силуэта.
 
-## Asset optimization
+## Производительность
 
-Run the model audit with:
+Тестирование выполнялось на следующем устройстве:
 
-```powershell
-npm run analyze:model -- public/models/bathroom_decimated2.glb public/models/bathroom_decimated2_optimized.glb
-npm run analyze:model -- public/models/towel.glb public/models/towel_optimized.glb
-```
+- Lenovo 83JG
+- AMD Ryzen 7 250 with Radeon 780M Graphics, 8 ядер и 16 потоков
+- NVIDIA GeForce RTX 5060 Laptop GPU
+- 32 GB RAM
+- Windows 11 Home
+- Google Chrome 150.0.7871.129
+- Render scale 1.25
 
-| Bathroom metric | Updated source | Optimized runtime | Change |
-|---|---:|---:|---:|
-| File size | 25.93 MiB | 4.95 MiB | -80.9% |
-| Rendered triangles | 352,610 | 340,149 | -12,461 redundant/degenerate faces |
-| POSITION slots | 444,496 | 471,233 | +26,737 / see below |
-| Render draws | 2,062 | 77 | -96.27% |
-| Embedded images | 53 JPEG/PNG | 48 KTX2 | 48/48 runtime textures |
+Наблюдаемый результат в production сборке:
 
-The removed hanging towel is shipped separately as `public/models/towel_optimized.glb` and attached with its exported world transform, preserving its original position. The updated bathroom export is corrected by `+3.59949` on X at its scene root to align it with the established camera, lights, and towel coordinates; Y and Z are unchanged. The towel is 0.24 MiB, one draw, 60,476 triangles, and contains one KTX2 texture. The combined runtime payload is 5.19 MiB, 78 draws, and 49 KTX2 textures.
+- 45 FPS во время навигации камеры
+- 30 FPS после перехода в idle режим
+- примерно 4–8 ms CPU frame time по панели `stats.js`
 
-Both runtime GLBs use post-join welding, Draco geometry compression, and `KHR_texture_basisu`. Material palette merging is disabled for the bathroom so named materials remain individually selectable and all saved material overrides continue to apply. Raw/intermediate model variants are excluded by `.vercelignore`. Both final files validate with no severity-0 or geometry errors.
+`stats.js` измеряет время работы кадра на CPU, это не GPU timestamp. Целевые 30 FPS выдерживаются, но для строгого GPU benchmark лучше дополнительно собрать WebGPU timestamp queries на нескольких устройствах.
 
-One two-triangle oak primitive referenced a base-color texture without the required UV set, which could render as a black patch. `scripts/fix-missing-uv-materials.mjs` now detects this invalid pairing and assigns a textureless cloned material with a dark neutral linear color.
+## Ограничения WebGPU и Three.js
 
-### Why the vertex counts look inconsistent
+- WebGPU требует современный браузер, подходящий GPU driver и secure context. Поддержка всё ещё менее универсальна, чем WebGL2.
+- TSL и WebGPU postprocessing API в Three.js развиваются быстро. Некоторые node interfaces меняются между релизами, поэтому версия Three.js зафиксирована.
+- У WebGPU pipeline нет прямой совместимости со старым WebGL `EffectComposer`. Passes и attachments пришлось собирать явно.
+- SSAO, SSR и SSGI экранные по своей природе. Они не видят закрытую или находящуюся за пределами кадра геометрию.
+- Прозрачное стекло не участвует в opaque G-buffer так же, как обычная поверхность. Это ограничивает вклад стекла в screen space GI и reflections.
+- WebGPU fallback на WebGL2 потребовал бы отдельной реализации части TSL passes и другого postprocessing graph. Простого переключения renderer здесь недостаточно.
+- GPU timestamps доступны не во всех браузерах и backend конфигурациях, поэтому в финальном интерфейсе оставлен стабильный CPU счётчик `stats.js`.
 
-The numbers are measuring different things:
+## Что я бы сделал дальше
 
-- A glTF POSITION accessor counts stored vertex slots, not triangle corners and not Blender's welded edit-mode vertices.
-- Indexed triangles reuse POSITION slots. The index count is therefore normally much larger than the POSITION count.
-- UV seams, hard normal edges, tangents, material boundaries, and modifier output split vertices that occupy the same location.
-- The updated bathroom source renders as 2,062 draws; the detached towel adds one draw.
-- Draco reduces transfer size but does not reduce the logical vertex or triangle count. Only topology changes such as decimation do that.
-- Summing every accessor also counts normals, UVs, indices, and other attributes, so it is not a valid vertex total.
+Если бы времени было больше, следующие шаги дали бы наибольшую пользу:
 
-The optimized files deliberately prioritize transfer size and draw-call consolidation over another destructive decimation pass. Joining primitives can split logical vertices at material, UV, normal, or tangent boundaries, which is why the runtime POSITION-slot total remains slightly higher. Post-join welding recovers most of that inflation while preserving named materials and 78 combined draws. The compressed payload is about one fifth of the combined source size.
+1. Добавить более строгий temporal history rejection и spatial denoiser для SSGI и SSR.
+2. Сделать LOD для полотенца и нескольких мелких круглых деталей, где всё ещё много геометрии.
+3. Добавить GPU timestamp profiling и собрать таблицу на дискретной и интегрированной видеокарте.
+4. Перевести управление passes в небольшой render graph с переиспользованием transient attachments.
+5. Подготовить отдельный облегчённый quality preset для мобильных и интегрированных GPU.
+6. При наличии дополнительного бюджета кадра добавить локальные reflection probes или выборочный planar mirror только для high-end профиля.
+7. Провести ещё один материал и light matching pass по фиксированным reference cameras, желательно с автоматическим image diff.
 
-The largest remaining runtime geometry is concentrated in textile, towel, carpet, fixture, and curved accessory meshes. Their dense curves, folds, seams, and hard-normal splits are also why broad Blender decimation produces a smaller reduction than the visible object count suggests; further work should target those meshes selectively instead of simplifying the whole room again.
+## Деплой
 
-## KTX2 workflow
+Проект готов к Vercel без серверной части. `vercel.json` запускает production сборку, публикует `dist` и перенаправляет все маршруты на `index.html`.
 
-The two runtime models contain 49 KTX2 textures in total. Future texture replacements must be converted with the provided KTX-Software installation:
+Перед финальной отправкой нужно:
 
-```powershell
-$toktx = 'C:\Users\Alexander\Work\tools\KTX-Software\bin-4.4.2\bin\toktx.exe'
+1. Выполнить `npm run build`.
+2. Проверить production deployment в Chrome с аппаратным WebGPU.
+3. Вставить публичный URL в раздел «Ссылки».
+4. Зафиксировать FPS из этого же deployment и при необходимости обновить цифры выше.
 
-# Albedo and emissive: sRGB
-& $toktx --t2 --encode uastc --uastc_quality 2 --zcmp 18 --genmipmap --assign_oetf srgb albedo.ktx2 albedo.png
+## Источники ассетов
 
-# Normal, roughness, metalness, and AO: linear
-& $toktx --t2 --encode uastc --uastc_quality 2 --zcmp 18 --genmipmap --assign_oetf linear normal.ktx2 normal.png
-```
-
-Do not tag normal or scalar maps as sRGB. After replacing images in either GLB, verify `KHR_texture_basisu` and the texture count with `npm run analyze:model -- <path-to-optimized.glb>` and visually compare the optimized asset with the source.
-
-## What worked
-
-- WebGPU-only renderer and TSL render pipeline.
-- Reference-matched camera, light placement, warm-neutral color, and real direct-light shadows.
-- KTX2 + Draco asset delivery with a large draw-call reduction.
-- Thin glass without the former grazing-angle white veil.
-- Normalized converted dielectrics and calibrated metal identities, preventing the false black-wall and black-trim response.
-- Deployed-compatible SSR for metal and polished dielectrics, subtle SSGI, and firefly-safe TRAA stabilization in a reversible tone-compressed domain.
-- Stable PBR/SSR mirror without a camera-following planar proxy.
-- Free OrbitControls navigation plus reproducible `lil-gui` tuning and JSON parameter export.
-- Reliable 30 FPS idle mode to control thermals.
-
-## Known limitations and next steps
-
-- SSR cannot reflect off-screen geometry and can still show edge loss on very rough or thin objects.
-- The mirror inherits that SSR limitation, but its reflection no longer swims or reveals a fixed environment capture as the camera moves.
-- SSGI is screen-space and temporally accumulated; disocclusion can briefly expose noise.
-- Transparent glass is excluded from the opaque G-buffer, so it cannot participate in SSAO/SSR exactly like opaque geometry.
-- The source remains geometry-heavy. The detached towel alone is 60,476 triangles; a future visual LOD should target its folds together with the carpet and curved fixtures while preserving silhouettes and UVs.
-- A future render graph could make pass lifetime and transient texture reuse more explicit.
-
-There is intentionally no WebGL fallback. A fallback would require reformulating the TSL/WebGPU pipeline and omitting or replacing compute-oriented passes rather than merely switching renderer constructors.
-
-## Attribution
-
-- Bathroom model: [Bathroom Interior by Oguz Kaya](https://sketchfab.com/3d-models/bathroom-interior-68be8975cca1481c85c20b590e81c6a6), licensed CC BY.
-- HDRI: [Studio Small 08 by Sergej Majboroda / Poly Haven](https://polyhaven.com/a/studio_small_08), CC0.
+- Bathroom Interior, Oguz Kaya, Sketchfab, лицензия CC BY.
+- Studio Small 08, Sergej Majboroda, Poly Haven, лицензия CC0.

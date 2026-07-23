@@ -42,7 +42,7 @@ export class Renderer {
       throw new Error('WebGPU backend initialization failed')
     }
 
-    this.setPixelRatio(1)
+    this.setPixelRatio(1.25)
   }
 
   setPixelRatio(pixelRatio: number): void {

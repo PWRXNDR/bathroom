@@ -15,10 +15,7 @@ import { Bathroom } from './Bathroom'
 
 export class World {
   readonly scene = new Scene()
-  readonly bathroom: Bathroom
-  readonly environmentTarget: RenderTarget
-  readonly ambientLight: AmbientLight
-  readonly spotLights: [SpotLight, SpotLight, SpotLight]
+  private readonly environmentTarget: RenderTarget
 
   constructor(
     renderer: WebGPURenderer,
@@ -36,16 +33,14 @@ export class World {
     this.scene.environment = this.environmentTarget.texture
     pmrem.dispose()
 
-    this.bathroom = new Bathroom(
+    new Bathroom(
       this.scene,
       bathroomAsset,
       towelAsset,
       this.environmentTarget.texture,
       Math.min(renderer.getMaxAnisotropy(), 8),
     )
-    const lights = this.addLights()
-    this.ambientLight = lights.ambient
-    this.spotLights = lights.spots
+    this.addLights()
   }
 
   dispose(): void {
@@ -53,10 +48,7 @@ export class World {
     this.environmentSource.dispose()
   }
 
-  private addLights(): {
-    ambient: AmbientLight
-    spots: [SpotLight, SpotLight, SpotLight]
-  } {
+  private addLights(): void {
     const ambient = new AmbientLight(0xdde1e6, 0.2)
     ambient.name = 'Reference ambient fill'
     this.scene.add(ambient)
@@ -139,7 +131,7 @@ export class World {
       },
     ] as const
 
-    const spotLights = spots.map((settings, index) => {
+    spots.forEach((settings, index) => {
       const [x, y, z] = settings.position
       const [targetX, targetY, targetZ] = settings.target
       const spot = new SpotLight(
@@ -164,9 +156,6 @@ export class World {
       spot.shadow.needsUpdate = true
 
       this.scene.add(spot, spot.target)
-      return spot
-    }) as [SpotLight, SpotLight, SpotLight]
-
-    return { ambient, spots: spotLights }
+    })
   }
 }

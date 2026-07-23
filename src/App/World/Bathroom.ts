@@ -1,7 +1,6 @@
 import {
   Color,
   DoubleSide,
-  Euler,
   Group,
   Mesh,
   MeshPhysicalMaterial,
@@ -12,7 +11,7 @@ import {
 } from 'three/webgpu'
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js'
 
-export type SurfaceMaterial = MeshStandardMaterial | MeshPhysicalMaterial
+type SurfaceMaterial = MeshStandardMaterial | MeshPhysicalMaterial
 
 type ScreenSpaceSurfaceMaterial = SurfaceMaterial & {
   ior: number
@@ -275,8 +274,7 @@ const POLISHED_ROUGHNESS = 0.02
 const BATHROOM_EXPORT_OFFSET_X = 3.59949
 
 export class Bathroom {
-  readonly model: Object3D
-  private readonly environmentMaterials = new Set<SurfaceMaterial>()
+  private readonly model: Object3D
 
   constructor(
     scene: Scene,
@@ -336,12 +334,6 @@ export class Bathroom {
         this.improveTextureFiltering(material)
       }
     })
-  }
-
-  setEnvironmentRotation(rotation: Euler): void {
-    for (const material of this.environmentMaterials) {
-      material.envMapRotation.copy(rotation)
-    }
   }
 
   private normalizePhysicalMaterial(material: SurfaceMaterial): void {
@@ -533,16 +525,6 @@ export class Bathroom {
     if (tuning) this.applyTuning(material, tuning)
   }
 
-  setLocalEnvironment(material: SurfaceMaterial, enabled: boolean): void {
-    if (enabled) {
-      this.setEnvironmentStrength(material, material.envMapIntensity)
-    } else {
-      material.envMap = null
-      material.needsUpdate = true
-      this.environmentMaterials.delete(material)
-    }
-  }
-
   private applyTuning(
     material: SurfaceMaterial,
     tuning: MaterialTuning,
@@ -566,7 +548,6 @@ export class Bathroom {
       this.setEnvironmentStrength(material, tuning.envMapIntensity)
     } else {
       material.envMap = null
-      this.environmentMaterials.delete(material)
     }
 
     if (material instanceof MeshPhysicalMaterial) {
@@ -597,7 +578,6 @@ export class Bathroom {
     material.envMap = this.environment
     material.envMapIntensity = intensity
     material.needsUpdate = true
-    this.environmentMaterials.add(material)
   }
 
   private removeMirrorTextures(material: SurfaceMaterial): void {

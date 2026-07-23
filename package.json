@@ -6,11 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "analyze:model": "node scripts/analyze-model.mjs"
+    "preview": "vite preview"
   },
   "dependencies": {
-    "lil-gui": "^0.21.0",
     "stats.js": "0.17.0",
     "three": "0.185.1"
   },

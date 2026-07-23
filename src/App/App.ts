@@ -1,14 +1,11 @@
-import { AdaptiveQuality } from './AdaptiveQuality'
 import { Camera } from './Camera'
 import { PostProcessing } from './PostProcessing'
 import { Renderer } from './Renderer'
-import { TuningPanel } from './UI/TuningPanel'
 import { UI } from './UI/UI'
 import { Preloader } from './UI/Preloader'
 import { AssetLoader } from './Utils/AssetLoader'
 import { AssetStore } from './Utils/AssetStore'
 import { Sizes } from './Utils/Sizes'
-import { LightGizmos } from './World/LightGizmos'
 import { World } from './World/World'
 
 export class App {
@@ -23,9 +20,6 @@ export class App {
 
   private world: World | null = null
   private post: PostProcessing | null = null
-  private quality: AdaptiveQuality | null = null
-  private lightGizmos: LightGizmos | null = null
-  private tuningPanel: TuningPanel | null = null
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new Renderer(canvas, this.sizes)
@@ -56,25 +50,12 @@ export class App {
       assets.towel,
       assets.environment,
     )
-    this.lightGizmos = new LightGizmos(
-      this.world.scene,
-      this.camera.instance,
-      this.canvas,
-      this.camera.controls,
-      this.world.spotLights,
-      this.markActive,
-    )
     this.post = new PostProcessing(
       this.renderer.instance,
       this.world.scene,
       this.camera.instance,
       this.world.environmentSource,
     )
-    this.quality = new AdaptiveQuality(
-      this.renderer,
-      this.post,
-    )
-
     this.preloader.setProgress(0.97)
     await this.renderer.instance.compileAsync(
       this.world.scene,
@@ -87,25 +68,13 @@ export class App {
     await this.preloader.complete()
     this.preloader.dispose()
     this.ui.show()
-    if (this.isGuiRoute()) {
-      this.tuningPanel = new TuningPanel({
-        canvas: this.canvas,
-        renderer: this.renderer,
-        camera: this.camera,
-        world: this.world,
-        post: this.post,
-        quality: this.quality,
-        lightGizmos: this.lightGizmos,
-        onChange: this.markActive,
-      })
-    }
     this.lastRenderTime = performance.now()
     this.activeUntil = this.lastRenderTime + 6000
     this.renderer.instance.setAnimationLoop(this.tick)
   }
 
   private readonly tick = (): void => {
-    if (!this.post || !this.quality) return
+    if (!this.post) return
 
     const now = performance.now()
     const isActive = now < this.activeUntil
@@ -116,16 +85,13 @@ export class App {
 
     this.ui.begin()
     const elapsed = now - this.lastRenderTime
-    const delta = Math.min(elapsed / 1000, 0.1)
     this.lastRenderTime =
       elapsed < frameInterval * 2
         ? this.lastRenderTime + frameInterval
         : now
     this.camera.update()
-    this.quality.update(delta)
-    this.lightGizmos?.update()
     this.post.render()
-    this.ui.end(this.quality.getRenderScale())
+    this.ui.end(this.renderer.getPixelRatio())
   }
 
   private readonly markActive = (): void => {
@@ -136,18 +102,12 @@ export class App {
     if (event.buttons !== 0) this.markActive()
   }
 
-  private isGuiRoute(): boolean {
-    return window.location.pathname.replace(/\/+$/, '') === '/gui'
-  }
-
   dispose(): void {
     this.renderer.instance.setAnimationLoop(null)
     this.canvas.removeEventListener('pointerdown', this.markActive)
     this.canvas.removeEventListener('pointermove', this.markPointerActive)
     this.canvas.removeEventListener('wheel', this.markActive)
     this.camera.controls.removeEventListener('change', this.markActive)
-    this.tuningPanel?.dispose()
-    this.lightGizmos?.dispose()
     this.camera.dispose()
     this.world?.dispose()
     this.ui.dispose()
