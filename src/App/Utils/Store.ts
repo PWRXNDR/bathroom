@@ -10,14 +10,14 @@ export const ASSET_PATHS = {
 
 export const CAMERA_PRESET = {
   position: new Vector3(
-    4.731680758554846,
-    1.7369184307406533,
-    -5.20380283190997,
+    4.776144981927044,
+    0.47925929221785896,
+    -3.6812544098889997,
   ),
   target: new Vector3(
-    2.4835505995980083,
-    1.392724728602472,
-    -3.315368863781783,
+    2.135027732733314,
+    0.8734051223777649,
+    -3.914499737144692,
   ),
 } as const
 
@@ -56,8 +56,8 @@ export const QUALITY_PROFILES: Record<QualityLevel, QualityProfile> = {
     pixelRatio: 1.25,
     aoResolution: 0.6,
     aoSamples: 14,
-    ssrResolution: 0.5,
-    ssrQuality: 0.46,
+    ssrResolution: 0.75,
+    ssrQuality: 0.65,
     ssgiSlices: 2,
     ssgiSteps: 8,
   },

@@ -36,9 +36,23 @@ interface MaterialTuning {
 }
 
 const MATERIAL_TUNING: Record<string, MaterialTuning> = {
+  mirror: {
+    color: '#696969',
+    roughness: 0,
+    metalness: 1,
+    normalScale: [1, -1],
+    aoIntensity: 1,
+    localEnvironment: true,
+    envMapIntensity: 0.18,
+    opacity: 1,
+    transparent: false,
+    depthWrite: true,
+    emissive: '#000000',
+    emissiveIntensity: 1,
+  },
   cream_ceramic: {
     color: '#f2f2f2',
-    roughness: 0.194,
+    roughness: 0.344,
     metalness: 0.516,
     normalScale: [1, -1],
     aoIntensity: 1,
@@ -185,7 +199,7 @@ const MATERIAL_TUNING: Record<string, MaterialTuning> = {
   },
   '2011.14_highres': {
     color: '#ffffff',
-    roughness: 0.532,
+    roughness: 0.359,
     metalness: 0.022,
     normalScale: [1, -1],
     aoIntensity: 1,
@@ -400,7 +414,7 @@ export class Bathroom {
 
     if (name.includes('mirror')) {
       this.removeMirrorTextures(material)
-      material.color.setHex(0x000000)
+      material.color.setHex(0xffffff)
       material.emissive.setHex(0x000000)
       material.emissiveIntensity = 1
       material.metalness = 1

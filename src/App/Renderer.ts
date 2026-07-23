@@ -1,6 +1,6 @@
 import {
   ACESFilmicToneMapping,
-  PCFSoftShadowMap,
+  PCFShadowMap,
   SRGBColorSpace,
   WebGPURenderer,
 } from 'three/webgpu'
@@ -25,7 +25,7 @@ export class Renderer {
     this.instance.toneMapping = ACESFilmicToneMapping
     this.instance.toneMappingExposure = 0.73
     this.instance.shadowMap.enabled = true
-    this.instance.shadowMap.type = PCFSoftShadowMap
+    this.instance.shadowMap.type = PCFShadowMap
 
     sizes.onResize(() => this.resize())
   }

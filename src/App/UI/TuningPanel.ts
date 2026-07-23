@@ -85,6 +85,7 @@ export class TuningPanel {
     this.addSsrControls()
     this.addSsgiControls()
     this.addTaaControls()
+    this.addBloomControls()
     this.materialInspector = new MaterialInspector({
       gui: this.gui,
       canvas: options.canvas,
@@ -281,9 +282,9 @@ export class TuningPanel {
     this.number(shadow, 'Normal bias', () => light.shadow.normalBias, (value) => {
       light.shadow.normalBias = value
     }, 0, 0.05, 0.0001, lightUpdate)
-    this.number(shadow, 'Radius', () => light.shadow.radius, (value) => {
+    this.number(shadow, 'Blur radius', () => light.shadow.radius, (value) => {
       light.shadow.radius = value
-    }, 0, 10, 0.1, lightUpdate)
+    }, 0, 12, 0.1, lightUpdate)
     this.number(shadow, 'Intensity', () => light.shadow.intensity, (value) => {
       light.shadow.intensity = value
       if (value > 0) this.shadowIntensityBeforeDisable.set(light, value)
@@ -357,6 +358,9 @@ export class TuningPanel {
     this.number(folder, 'Blur quality', () => effect.blurQuality, (value) => {
       effect.blurQuality = Math.round(value)
     }, 0, 5, 1, { refreshPipeline: true })
+    this.boolean(folder, 'Hit refinement', () => effect.binaryRefine, (value) => {
+      effect.binaryRefine = value
+    }, { refreshPipeline: true })
     this.boolean(folder, 'Reflect non-metals', () => effect.reflectNonMetals, (value) => {
       effect.reflectNonMetals = value
     }, { refreshPipeline: true })
@@ -423,6 +427,26 @@ export class TuningPanel {
     this.boolean(folder, 'Subpixel correction', () => effect.useSubpixelCorrection, (value) => {
       effect.useSubpixelCorrection = value
     }, { refreshPipeline: true })
+  }
+
+  private addBloomControls(): void {
+    const folder = this.gui.addFolder('Bloom')
+
+    this.boolean(folder, 'Enabled', () => this.post.isBloomEnabled(), (value) => {
+      this.post.setBloomEnabled(value)
+    })
+    this.number(folder, 'Strength', () => this.post.getBloomStrength(), (value) => {
+      this.post.setBloomStrength(value)
+    }, 0, 3, 0.01)
+    this.number(folder, 'Radius', () => this.post.getBloomRadius(), (value) => {
+      this.post.setBloomRadius(value)
+    }, 0, 1, 0.01)
+    this.number(folder, 'Threshold', () => this.post.getBloomThreshold(), (value) => {
+      this.post.setBloomThreshold(value)
+    }, 0, 5, 0.01)
+    this.number(folder, 'Resolution', () => this.post.getBloomResolutionScale(), (value) => {
+      this.post.setBloomResolutionScale(value)
+    }, 0.1, 1, 0.05, { manualQuality: true })
   }
 
   private addCopyButton(): void {
@@ -551,6 +575,7 @@ export class TuningPanel {
         quality: ssr.quality.value,
         resolutionScale: ssr.resolutionScale,
         blurQuality: ssr.blurQuality,
+        binaryRefine: ssr.binaryRefine,
         reflectNonMetals: ssr.reflectNonMetals,
       },
       ssgi: {
@@ -573,6 +598,13 @@ export class TuningPanel {
         depthThreshold: taa.depthThreshold,
         edgeDepthDiff: taa.edgeDepthDiff,
         useSubpixelCorrection: taa.useSubpixelCorrection,
+      },
+      bloom: {
+        enabled: this.post.isBloomEnabled(),
+        strength: this.post.getBloomStrength(),
+        radius: this.post.getBloomRadius(),
+        threshold: this.post.getBloomThreshold(),
+        resolutionScale: this.post.getBloomResolutionScale(),
       },
       composite: {
         saturation: this.post.getSaturation(),

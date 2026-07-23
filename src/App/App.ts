@@ -87,16 +87,18 @@ export class App {
     await this.preloader.complete()
     this.preloader.dispose()
     this.ui.show()
-    this.tuningPanel = new TuningPanel({
-      canvas: this.canvas,
-      renderer: this.renderer,
-      camera: this.camera,
-      world: this.world,
-      post: this.post,
-      quality: this.quality,
-      lightGizmos: this.lightGizmos,
-      onChange: this.markActive,
-    })
+    if (this.isGuiRoute()) {
+      this.tuningPanel = new TuningPanel({
+        canvas: this.canvas,
+        renderer: this.renderer,
+        camera: this.camera,
+        world: this.world,
+        post: this.post,
+        quality: this.quality,
+        lightGizmos: this.lightGizmos,
+        onChange: this.markActive,
+      })
+    }
     this.lastRenderTime = performance.now()
     this.activeUntil = this.lastRenderTime + 6000
     this.renderer.instance.setAnimationLoop(this.tick)
@@ -132,6 +134,10 @@ export class App {
 
   private readonly markPointerActive = (event: PointerEvent): void => {
     if (event.buttons !== 0) this.markActive()
+  }
+
+  private isGuiRoute(): boolean {
+    return window.location.pathname.replace(/\/+$/, '') === '/gui'
   }
 
   dispose(): void {

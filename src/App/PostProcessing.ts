@@ -27,6 +27,7 @@ import {
   velocity,
 } from 'three/tsl'
 import { ao, type default as GTAONode } from 'three/addons/tsl/display/GTAONode.js'
+import { bloom, type default as BloomNode } from 'three/addons/tsl/display/BloomNode.js'
 import { ssr, type default as SSRNode } from 'three/addons/tsl/display/SSRNode.js'
 import { ssgi, type default as SSGINode } from 'three/addons/tsl/display/SSGINode.js'
 import { traa, type default as TRAANode } from 'three/addons/tsl/display/TRAANode.js'
@@ -38,6 +39,8 @@ export class PostProcessing {
   readonly ssrPass: SSRNode
   readonly ssgiPass: SSGINode
   readonly taaPass: TRAANode
+  readonly bloomPass: BloomNode
+  private readonly directBloomPass: BloomNode
   private readonly aoContribution = uniform(0.27)
   private readonly ssrContribution = uniform(1.03)
   private readonly ssgiContribution = uniform(0.18)
@@ -45,7 +48,10 @@ export class PostProcessing {
   private readonly sharpenAmount = uniform(0.7)
   private readonly temporalOutput: ReturnType<typeof vec4>
   private readonly directOutput: ReturnType<typeof vec4>
+  private readonly temporalBloomOutput: ReturnType<typeof vec4>
+  private readonly directBloomOutput: ReturnType<typeof vec4>
   private taaEnabled = true
+  private bloomEnabled = false
 
   constructor(
     renderer: WebGPURenderer,
@@ -111,7 +117,7 @@ export class PostProcessing {
       diffuseNode: diffuse,
       reflectNonMetals: true,
       environmentNode: environment,
-      binaryRefine: false,
+      binaryRefine: true,
     })
     this.ssrPass.maxDistance.value = 6.92
     this.ssrPass.thickness.value = 0.085
@@ -119,8 +125,8 @@ export class PostProcessing {
     this.ssrPass.screenEdgeFade.value = 0.339
     this.ssrPass.maxLuminance.value = 5
     this.ssrPass.mirrorBias.value = 0.5
-    this.ssrPass.quality.value = 0.46
-    this.ssrPass.resolutionScale = 0.5
+    this.ssrPass.quality.value = 0.65
+    this.ssrPass.resolutionScale = 0.75
     this.ssrPass.blurQuality = 1
 
     this.ssgiPass = ssgi(beauty, depth, normal, camera)
@@ -199,6 +205,19 @@ export class PostProcessing {
       filteredDirect.a,
     )
 
+    this.bloomPass = bloom(this.temporalOutput, 0.12, 0.35, 1.1)
+    this.directBloomPass = bloom(this.directOutput, 0.12, 0.35, 1.1)
+    this.bloomPass.setResolutionScale(0.25)
+    this.directBloomPass.setResolutionScale(0.25)
+    this.temporalBloomOutput = vec4(
+      this.temporalOutput.rgb.add(this.bloomPass.rgb),
+      this.temporalOutput.a,
+    )
+    this.directBloomOutput = vec4(
+      this.directOutput.rgb.add(this.directBloomPass.rgb),
+      this.directOutput.a,
+    )
+
     this.pipeline = new RenderPipeline(renderer)
     this.pipeline.outputNode = this.temporalOutput
   }
@@ -215,9 +234,66 @@ export class PostProcessing {
     if (this.taaEnabled === enabled) return
 
     this.taaEnabled = enabled
-    this.pipeline.outputNode = enabled
-      ? this.temporalOutput
-      : this.directOutput
+    this.updateOutputNode()
+  }
+
+  isBloomEnabled(): boolean {
+    return this.bloomEnabled
+  }
+
+  setBloomEnabled(enabled: boolean): void {
+    if (this.bloomEnabled === enabled) return
+
+    this.bloomEnabled = enabled
+    this.updateOutputNode()
+  }
+
+  getBloomStrength(): number {
+    return this.bloomPass.strength.value
+  }
+
+  setBloomStrength(value: number): void {
+    this.bloomPass.strength.value = value
+    this.directBloomPass.strength.value = value
+  }
+
+  getBloomRadius(): number {
+    return this.bloomPass.radius.value
+  }
+
+  setBloomRadius(value: number): void {
+    this.bloomPass.radius.value = value
+    this.directBloomPass.radius.value = value
+  }
+
+  getBloomThreshold(): number {
+    return this.bloomPass.threshold.value
+  }
+
+  setBloomThreshold(value: number): void {
+    this.bloomPass.threshold.value = value
+    this.directBloomPass.threshold.value = value
+  }
+
+  getBloomResolutionScale(): number {
+    return this.bloomPass.getResolutionScale()
+  }
+
+  setBloomResolutionScale(value: number): void {
+    this.bloomPass.setResolutionScale(value)
+    this.directBloomPass.setResolutionScale(value)
+  }
+
+  private updateOutputNode(): void {
+    if (this.taaEnabled) {
+      this.pipeline.outputNode = this.bloomEnabled
+        ? this.temporalBloomOutput
+        : this.temporalOutput
+    } else {
+      this.pipeline.outputNode = this.bloomEnabled
+        ? this.directBloomOutput
+        : this.directOutput
+    }
     this.pipeline.needsUpdate = true
   }
 
