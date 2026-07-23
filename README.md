@@ -116,17 +116,20 @@ Run the model audit with:
 
 ```powershell
 npm run analyze:model -- public/models/bathroom_decimated2.glb public/models/bathroom_decimated2_optimized.glb
+npm run analyze:model -- public/models/towel.glb public/models/towel_optimized.glb
 ```
 
-| Metric | New decimated source | WebGPU runtime | Change |
+| Bathroom metric | Updated source | Optimized runtime | Change |
 |---|---:|---:|---:|
-| File size | 27.38 MiB | 5.19 MiB | -81.0% |
-| Rendered triangles | 411,711 | 406,359 | -5,352 zero-area faces |
-| POSITION slots | 475,842 | 494,509 | +18,667 / see below |
-| Render draws | 2,064 | 79 | -96.17% |
-| Embedded textures | 54 JPEG/PNG | 49 KTX2 | 49/49 runtime textures |
+| File size | 25.93 MiB | 4.95 MiB | -80.9% |
+| Rendered triangles | 352,610 | 340,149 | -12,461 redundant/degenerate faces |
+| POSITION slots | 444,496 | 471,233 | +26,737 / see below |
+| Render draws | 2,062 | 77 | -96.27% |
+| Embedded images | 53 JPEG/PNG | 48 KTX2 | 48/48 runtime textures |
 
-`public/models/bathroom_decimated2_optimized.glb` is the only model shipped to the application. It uses post-join welding, Draco geometry compression, and `KHR_texture_basisu`; all 49 retained images are KTX2. The raw source, the WebP-compressed intermediate, and older model variants are excluded by `.vercelignore`. Duplicate resources were removed, and Draco discarded 5,344 zero-area/non-contributing faces found after welding. The final GLB validates with zero severity-0 or geometry errors.
+The removed hanging towel is shipped separately as `public/models/towel_optimized.glb` and attached with its exported world transform, preserving its original position. The updated bathroom export is corrected by `+3.59949` on X at its scene root to align it with the established camera, lights, and towel coordinates; Y and Z are unchanged. The towel is 0.24 MiB, one draw, 60,476 triangles, and contains one KTX2 texture. The combined runtime payload is 5.19 MiB, 78 draws, and 49 KTX2 textures.
+
+Both runtime GLBs use post-join welding, Draco geometry compression, and `KHR_texture_basisu`. Material palette merging is disabled for the bathroom so named materials remain individually selectable and all saved material overrides continue to apply. Raw/intermediate model variants are excluded by `.vercelignore`. Both final files validate with no severity-0 or geometry errors.
 
 One two-triangle oak primitive referenced a base-color texture without the required UV set, which could render as a black patch. `scripts/fix-missing-uv-materials.mjs` now detects this invalid pairing and assigns a textureless cloned material with a dark neutral linear color.
 
@@ -137,17 +140,17 @@ The numbers are measuring different things:
 - A glTF POSITION accessor counts stored vertex slots, not triangle corners and not Blender's welded edit-mode vertices.
 - Indexed triangles reuse POSITION slots. The index count is therefore normally much larger than the POSITION count.
 - UV seams, hard normal edges, tangents, material boundaries, and modifier output split vertices that occupy the same location.
-- The new source contains 2,061 primitive definitions and renders as 2,064 draws. It also contains five duplicate image groups and 63 groups of identical accessor payloads.
+- The updated bathroom source renders as 2,062 draws; the detached towel adds one draw.
 - Draco reduces transfer size but does not reduce the logical vertex or triangle count. Only topology changes such as decimation do that.
 - Summing every accessor also counts normals, UVs, indices, and other attributes, so it is not a valid vertex total.
 
-The optimized file deliberately prioritizes transfer size and draw-call consolidation over another destructive decimation pass. Joining primitives can split logical vertices at material, UV, normal, or tangent boundaries, which is why the runtime POSITION-slot total remains slightly higher. A second weld after joining recovered most of the inflation while preserving 79 draws. The compressed file submits far fewer draws and is about one fifth of the source size.
+The optimized files deliberately prioritize transfer size and draw-call consolidation over another destructive decimation pass. Joining primitives can split logical vertices at material, UV, normal, or tangent boundaries, which is why the runtime POSITION-slot total remains slightly higher. Post-join welding recovers most of that inflation while preserving named materials and 78 combined draws. The compressed payload is about one fifth of the combined source size.
 
 The largest remaining runtime geometry is concentrated in textile, towel, carpet, fixture, and curved accessory meshes. Their dense curves, folds, seams, and hard-normal splits are also why broad Blender decimation produces a smaller reduction than the visible object count suggests; further work should target those meshes selectively instead of simplifying the whole room again.
 
 ## KTX2 workflow
 
-The current runtime model already contains 49 KTX2 textures. Future texture replacements must be converted with the provided KTX-Software installation:
+The two runtime models contain 49 KTX2 textures in total. Future texture replacements must be converted with the provided KTX-Software installation:
 
 ```powershell
 $toktx = 'C:\Users\Alexander\Work\tools\KTX-Software\bin-4.4.2\bin\toktx.exe'
@@ -159,7 +162,7 @@ $toktx = 'C:\Users\Alexander\Work\tools\KTX-Software\bin-4.4.2\bin\toktx.exe'
 & $toktx --t2 --encode uastc --uastc_quality 2 --zcmp 18 --genmipmap --assign_oetf linear normal.ktx2 normal.png
 ```
 
-Do not tag normal or scalar maps as sRGB. After replacing images in the GLB, verify `KHR_texture_basisu` and the texture count with `npm run analyze:model -- public/models/bathroom_decimated2_optimized.glb` and visually compare the optimized asset with the source.
+Do not tag normal or scalar maps as sRGB. After replacing images in either GLB, verify `KHR_texture_basisu` and the texture count with `npm run analyze:model -- <path-to-optimized.glb>` and visually compare the optimized asset with the source.
 
 ## What worked
 
@@ -179,7 +182,7 @@ Do not tag normal or scalar maps as sRGB. After replacing images in the GLB, ver
 - The mirror inherits that SSR limitation, but its reflection no longer swims or reveals a fixed environment capture as the camera moves.
 - SSGI is screen-space and temporally accumulated; disocclusion can briefly expose noise.
 - Transparent glass is excluded from the opaque G-buffer, so it cannot participate in SSAO/SSR exactly like opaque geometry.
-- The source model remains geometry-heavy. The next optimization pass should target the textile, towel, carpet, and curved-fixture meshes surgically, preserving silhouettes and UVs.
+- The source remains geometry-heavy. The detached towel alone is 60,476 triangles; a future visual LOD should target its folds together with the carpet and curved fixtures while preserving silhouettes and UVs.
 - A future render graph could make pass lifetime and transient texture reuse more explicit.
 
 There is intentionally no WebGL fallback. A fallback would require reformulating the TSL/WebGPU pipeline and omitting or replacing compute-oriented passes rather than merely switching renderer constructors.

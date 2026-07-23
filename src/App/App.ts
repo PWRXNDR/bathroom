@@ -53,6 +53,7 @@ export class App {
     this.world = new World(
       this.renderer.instance,
       assets.bathroom,
+      assets.towel,
       assets.environment,
     )
     this.lightGizmos = new LightGizmos(
@@ -87,6 +88,7 @@ export class App {
     this.preloader.dispose()
     this.ui.show()
     this.tuningPanel = new TuningPanel({
+      canvas: this.canvas,
       renderer: this.renderer,
       camera: this.camera,
       world: this.world,

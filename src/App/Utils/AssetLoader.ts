@@ -37,8 +37,9 @@ export class AssetLoader {
   }
 
   async load(): Promise<LoadedAssets> {
-    const [bathroom, environment] = await Promise.all([
+    const [bathroom, towel, environment] = await Promise.all([
       this.loadGLTF(ASSET_PATHS.model),
+      this.loadGLTF(ASSET_PATHS.towel),
       this.loadHDR(ASSET_PATHS.environment),
     ])
 
@@ -46,7 +47,7 @@ export class AssetLoader {
     this.dracoLoader.dispose()
     this.ktx2Loader.dispose()
 
-    return { bathroom, environment }
+    return { bathroom, towel, environment }
   }
 
   private loadGLTF(url: string): Promise<GLTF> {

@@ -3,6 +3,7 @@ import type { GLTF } from 'three/addons/loaders/GLTFLoader.js'
 
 export interface LoadedAssets {
   bathroom: GLTF
+  towel: GLTF
   environment: DataTexture
 }
 

@@ -2,6 +2,7 @@ import { Vector3 } from 'three/webgpu'
 
 export const ASSET_PATHS = {
   model: '/models/bathroom_decimated2_optimized.glb',
+  towel: '/models/towel_optimized.glb',
   environment: '/environment/studio_small_08_1k.hdr',
   basis: '/basis/',
   draco: '/draco/',
@@ -9,14 +10,14 @@ export const ASSET_PATHS = {
 
 export const CAMERA_PRESET = {
   position: new Vector3(
-    4.701486185665289,
-    1.7293424924378216,
-    -5.122794137977619,
+    4.731680758554846,
+    1.7369184307406533,
+    -5.20380283190997,
   ),
   target: new Vector3(
-    2.8116709936440594,
-    1.043221654572334,
-    -3.4039136664218153,
+    2.4835505995980083,
+    1.392724728602472,
+    -3.315368863781783,
   ),
 } as const
 

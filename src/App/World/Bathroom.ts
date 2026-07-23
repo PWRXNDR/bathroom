@@ -1,6 +1,7 @@
 import {
   DoubleSide,
   Euler,
+  Group,
   Mesh,
   MeshPhysicalMaterial,
   MeshStandardMaterial,
@@ -10,10 +11,224 @@ import {
 } from 'three/webgpu'
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js'
 
-type SurfaceMaterial = MeshStandardMaterial | MeshPhysicalMaterial
+export type SurfaceMaterial = MeshStandardMaterial | MeshPhysicalMaterial
+
+interface MaterialTuning {
+  color: string
+  roughness: number
+  metalness: number
+  localEnvironment: boolean
+  envMapIntensity: number
+  opacity: number
+  transparent: boolean
+  depthWrite: boolean
+  emissive: string
+  emissiveIntensity: number
+  normalScale?: [number, number]
+  aoIntensity?: number
+  transmission?: number
+  ior?: number
+  thickness?: number
+  clearcoat?: number
+  clearcoatRoughness?: number
+  specularIntensity?: number
+  specularColor?: string
+}
+
+const MATERIAL_TUNING: Record<string, MaterialTuning> = {
+  cream_ceramic: {
+    color: '#f2f2f2',
+    roughness: 0.194,
+    metalness: 0.516,
+    normalScale: [1, -1],
+    aoIntensity: 1,
+    localEnvironment: true,
+    envMapIntensity: 0.153,
+    opacity: 1,
+    transparent: false,
+    depthWrite: true,
+    emissive: '#000000',
+    emissiveIntensity: 1,
+    transmission: 0,
+    ior: 1000,
+    thickness: 0,
+    clearcoat: 0,
+    clearcoatRoughness: 0,
+    specularIntensity: 1,
+    specularColor: '#ffffff',
+  },
+  'r4371-mountain-oak-dunkel-b': {
+    color: '#ffffff',
+    roughness: 0.94,
+    metalness: 0.917,
+    normalScale: [1, -1],
+    aoIntensity: 1,
+    localEnvironment: false,
+    envMapIntensity: 1,
+    opacity: 1,
+    transparent: false,
+    depthWrite: true,
+    emissive: '#000000',
+    emissiveIntensity: 1,
+    transmission: 0,
+    ior: 1000,
+    thickness: 0,
+    clearcoat: 0,
+    clearcoatRoughness: 0,
+    specularIntensity: 1,
+    specularColor: '#ffffff',
+  },
+  textile_vinyl_textured_blue_grey1: {
+    color: '#ffffff',
+    roughness: 1,
+    metalness: 0,
+    normalScale: [1, -1],
+    aoIntensity: 1,
+    localEnvironment: true,
+    envMapIntensity: 0.748,
+    opacity: 1,
+    transparent: false,
+    depthWrite: true,
+    emissive: '#000000',
+    emissiveIntensity: 1,
+    transmission: 0,
+    ior: 1,
+    thickness: 0,
+    clearcoat: 0,
+    clearcoatRoughness: 0,
+    specularIntensity: 1,
+    specularColor: '#ffffff',
+  },
+  material_11: {
+    color: '#ffffff',
+    roughness: 1,
+    metalness: 0,
+    normalScale: [1, -1],
+    aoIntensity: 1,
+    localEnvironment: true,
+    envMapIntensity: 1.125,
+    opacity: 1,
+    transparent: false,
+    depthWrite: true,
+    emissive: '#000000',
+    emissiveIntensity: 1,
+    transmission: 0,
+    ior: 1000,
+    thickness: 0,
+    clearcoat: 0,
+    clearcoatRoughness: 0,
+    specularIntensity: 1,
+    specularColor: '#000000',
+  },
+  '101219dc0000000000045104_370x275_b': {
+    color: '#ffffff',
+    roughness: 0.909,
+    metalness: 0,
+    normalScale: [1, -1],
+    aoIntensity: 1,
+    localEnvironment: false,
+    envMapIntensity: 1,
+    opacity: 1,
+    transparent: false,
+    depthWrite: true,
+    emissive: '#000000',
+    emissiveIntensity: 1,
+    transmission: 0,
+    ior: 1000,
+    thickness: 0,
+    clearcoat: 0,
+    clearcoatRoughness: 0,
+    specularIntensity: 1,
+    specularColor: '#414141',
+  },
+  chrome_blurry: {
+    color: '#cfd3d5',
+    roughness: 0.414,
+    metalness: 1,
+    normalScale: [1, -1],
+    aoIntensity: 1,
+    localEnvironment: true,
+    envMapIntensity: 0.18,
+    opacity: 1,
+    transparent: false,
+    depthWrite: true,
+    emissive: '#000000',
+    emissiveIntensity: 1,
+    transmission: 0,
+    ior: 1.5,
+    thickness: 0,
+    clearcoat: 0,
+    clearcoatRoughness: 0,
+    specularIntensity: 0.55,
+    specularColor: '#ffffff',
+  },
+  'black-hammertone-301x300bijgewerkt': {
+    color: '#25282a',
+    roughness: 0.053,
+    metalness: 0.893,
+    normalScale: [1, -1],
+    aoIntensity: 1,
+    localEnvironment: true,
+    envMapIntensity: 0.395,
+    opacity: 1,
+    transparent: false,
+    depthWrite: true,
+    emissive: '#000000',
+    emissiveIntensity: 1,
+    transmission: 0,
+    ior: 1.5,
+    thickness: 0,
+    clearcoat: 0,
+    clearcoatRoughness: 0,
+    specularIntensity: 0.55,
+    specularColor: '#ffffff',
+  },
+  '2011.14_highres': {
+    color: '#ffffff',
+    roughness: 0.532,
+    metalness: 0.022,
+    normalScale: [1, -1],
+    aoIntensity: 1,
+    localEnvironment: true,
+    envMapIntensity: 0.701,
+    opacity: 1,
+    transparent: false,
+    depthWrite: true,
+    emissive: '#000000',
+    emissiveIntensity: 1,
+    transmission: 0,
+    ior: 1.5,
+    thickness: 0,
+    clearcoat: 0,
+    clearcoatRoughness: 0,
+    specularIntensity: 0.55,
+    specularColor: '#ffffff',
+  },
+  '88775-bl-b1': {
+    color: '#ffffff',
+    roughness: 0.179,
+    metalness: 0,
+    normalScale: [1, -1],
+    aoIntensity: 1,
+    localEnvironment: true,
+    envMapIntensity: 1,
+    opacity: 1,
+    transparent: false,
+    depthWrite: true,
+    emissive: '#000000',
+    emissiveIntensity: 1,
+    transmission: 0,
+    ior: 1.5,
+    thickness: 0,
+    clearcoat: 0,
+    clearcoatRoughness: 0,
+    specularIntensity: 0.55,
+    specularColor: '#ffffff',
+  },
+}
 
 const POLISHED_ROUGHNESS = 0.02
-const MIRROR_ROUGHNESS = 0.005
+const BATHROOM_EXPORT_OFFSET_X = 3.59949
 
 export class Bathroom {
   readonly model: Object3D
@@ -22,10 +237,14 @@ export class Bathroom {
   constructor(
     scene: Scene,
     gltf: GLTF,
+    towelGltf: GLTF,
     private readonly environment: Texture,
     private readonly textureAnisotropy: number,
   ) {
-    this.model = gltf.scene
+    this.model = new Group()
+    this.model.name = 'Bathroom assets'
+    gltf.scene.position.x += BATHROOM_EXPORT_OFFSET_X
+    this.model.add(gltf.scene, towelGltf.scene)
     this.prepareMaterials()
     scene.add(this.model)
   }
@@ -180,10 +399,30 @@ export class Bathroom {
     }
 
     if (name.includes('mirror')) {
-      material.color.setHex(0xe7e9ea)
+      this.removeMirrorTextures(material)
+      material.color.setHex(0x000000)
+      material.emissive.setHex(0x000000)
+      material.emissiveIntensity = 1
       material.metalness = 1
-      material.roughness = MIRROR_ROUGHNESS
-      this.setEnvironmentStrength(material, 0.022)
+      material.roughness = 0
+      material.normalScale.set(1, -1)
+      material.aoMapIntensity = 1
+      material.opacity = 1
+      material.transparent = false
+      material.depthTest = true
+      material.depthWrite = true
+      material.side = DoubleSide
+      this.setEnvironmentStrength(material, 0.18)
+
+      if (material instanceof MeshPhysicalMaterial) {
+        material.transmission = 0
+        material.thickness = 0
+        material.clearcoat = 0
+        material.iridescence = 0
+        material.sheen = 0
+        material.specularIntensity = 1
+        material.specularColor.setHex(0xffffff)
+      }
     }
 
     if (name.includes('glass_pure')) {
@@ -230,6 +469,66 @@ export class Bathroom {
         material.thickness = 0
       }
     }
+
+    const tuning = MATERIAL_TUNING[name]
+    if (tuning) this.applyTuning(material, tuning)
+  }
+
+  setLocalEnvironment(material: SurfaceMaterial, enabled: boolean): void {
+    if (enabled) {
+      this.setEnvironmentStrength(material, material.envMapIntensity)
+    } else {
+      material.envMap = null
+      material.needsUpdate = true
+      this.environmentMaterials.delete(material)
+    }
+  }
+
+  private applyTuning(
+    material: SurfaceMaterial,
+    tuning: MaterialTuning,
+  ): void {
+    material.color.set(tuning.color)
+    material.roughness = tuning.roughness
+    material.metalness = tuning.metalness
+    material.envMapIntensity = tuning.envMapIntensity
+    material.opacity = tuning.opacity
+    material.transparent = tuning.transparent
+    material.depthWrite = tuning.depthWrite
+    material.emissive.set(tuning.emissive)
+    material.emissiveIntensity = tuning.emissiveIntensity
+
+    if (tuning.normalScale) material.normalScale.set(...tuning.normalScale)
+    if (tuning.aoIntensity !== undefined) {
+      material.aoMapIntensity = tuning.aoIntensity
+    }
+
+    if (tuning.localEnvironment) {
+      this.setEnvironmentStrength(material, tuning.envMapIntensity)
+    } else {
+      material.envMap = null
+      this.environmentMaterials.delete(material)
+    }
+
+    if (material instanceof MeshPhysicalMaterial) {
+      if (tuning.transmission !== undefined) {
+        material.transmission = tuning.transmission
+      }
+      if (tuning.ior !== undefined) material.ior = tuning.ior
+      if (tuning.thickness !== undefined) material.thickness = tuning.thickness
+      if (tuning.clearcoat !== undefined) material.clearcoat = tuning.clearcoat
+      if (tuning.clearcoatRoughness !== undefined) {
+        material.clearcoatRoughness = tuning.clearcoatRoughness
+      }
+      if (tuning.specularIntensity !== undefined) {
+        material.specularIntensity = tuning.specularIntensity
+      }
+      if (tuning.specularColor) {
+        material.specularColor.set(tuning.specularColor)
+      }
+    }
+
+    material.needsUpdate = true
   }
 
   private setEnvironmentStrength(
@@ -240,5 +539,33 @@ export class Bathroom {
     material.envMapIntensity = intensity
     material.needsUpdate = true
     this.environmentMaterials.add(material)
+  }
+
+  private removeMirrorTextures(material: SurfaceMaterial): void {
+    material.map = null
+    material.lightMap = null
+    material.aoMap = null
+    material.emissiveMap = null
+    material.bumpMap = null
+    material.normalMap = null
+    material.displacementMap = null
+    material.roughnessMap = null
+    material.metalnessMap = null
+    material.alphaMap = null
+
+    if (material instanceof MeshPhysicalMaterial) {
+      material.anisotropyMap = null
+      material.clearcoatMap = null
+      material.clearcoatNormalMap = null
+      material.clearcoatRoughnessMap = null
+      material.iridescenceMap = null
+      material.iridescenceThicknessMap = null
+      material.sheenColorMap = null
+      material.sheenRoughnessMap = null
+      material.specularColorMap = null
+      material.specularIntensityMap = null
+      material.thicknessMap = null
+      material.transmissionMap = null
+    }
   }
 }

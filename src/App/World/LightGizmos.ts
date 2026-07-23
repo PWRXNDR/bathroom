@@ -31,7 +31,7 @@ export class LightGizmos {
   private readonly targetGeometry = new OctahedronGeometry(0.06, 0)
   private selectedLight = 0
   private handle: LightGizmoHandle = 'target'
-  private visible = true
+  private visible = false
   private orbitWasEnabled = true
   private translationSnap = 0
   private helperLength = 1
@@ -59,7 +59,7 @@ export class LightGizmos {
     this.canvas.addEventListener('pointerdown', this.handleMarkerSelection, true)
 
     this.attachSelectedObject()
-    this.update()
+    this.setVisible(false)
   }
 
   update(): void {

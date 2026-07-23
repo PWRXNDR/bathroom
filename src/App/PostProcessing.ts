@@ -39,7 +39,7 @@ export class PostProcessing {
   readonly ssgiPass: SSGINode
   readonly taaPass: TRAANode
   private readonly aoContribution = uniform(0.27)
-  private readonly ssrContribution = uniform(0.5)
+  private readonly ssrContribution = uniform(1.03)
   private readonly ssgiContribution = uniform(0.18)
   private readonly saturationAmount = uniform(0.88)
   private readonly sharpenAmount = uniform(0.7)
@@ -113,9 +113,9 @@ export class PostProcessing {
       environmentNode: environment,
       binaryRefine: false,
     })
-    this.ssrPass.maxDistance.value = 3.13
+    this.ssrPass.maxDistance.value = 6.92
     this.ssrPass.thickness.value = 0.085
-    this.ssrPass.intensity.value = 0.5
+    this.ssrPass.intensity.value = 0.28
     this.ssrPass.screenEdgeFade.value = 0.339
     this.ssrPass.maxLuminance.value = 5
     this.ssrPass.mirrorBias.value = 0.5

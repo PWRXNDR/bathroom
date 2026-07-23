@@ -22,8 +22,10 @@ import {
   type LightGizmos,
 } from '../World/LightGizmos'
 import type { World } from '../World/World'
+import { MaterialInspector } from './MaterialInspector'
 
 export interface TuningPanelOptions {
+  canvas: HTMLCanvasElement
   camera: Camera
   renderer: Renderer
   world: World
@@ -63,6 +65,8 @@ export class TuningPanel {
   private readonly quality: AdaptiveQuality
   private readonly lightGizmos: LightGizmos
   private readonly onChange: () => void
+  private readonly materialInspector: MaterialInspector
+  private readonly shadowIntensityBeforeDisable = new WeakMap<SpotLight, number>()
   private copyResetTimer = 0
 
   constructor(options: TuningPanelOptions) {
@@ -81,11 +85,23 @@ export class TuningPanel {
     this.addSsrControls()
     this.addSsgiControls()
     this.addTaaControls()
+    this.materialInspector = new MaterialInspector({
+      gui: this.gui,
+      canvas: options.canvas,
+      camera: this.camera.instance,
+      model: this.world.bathroom.model,
+      modelPath: ASSET_PATHS.model,
+      setLocalEnvironment: (material, enabled) => {
+        this.world.bathroom.setLocalEnvironment(material, enabled)
+      },
+      onChange: this.onChange,
+    })
     this.addCopyButton()
   }
 
   dispose(): void {
     window.clearTimeout(this.copyResetTimer)
+    this.materialInspector.dispose()
     this.gui.destroy()
   }
 
@@ -222,6 +238,7 @@ export class TuningPanel {
     const invalidateShadow = (): void => this.lightGizmos.refreshLight(light, true)
     const lightUpdate: BindingOptions = { afterChange: syncLight }
     const shadowUpdate: BindingOptions = { afterChange: invalidateShadow }
+    this.shadowIntensityBeforeDisable.set(light, light.shadow.intensity)
 
     this.color(folder, 'Color', light.color, lightUpdate)
     this.number(folder, 'Intensity', () => light.intensity, (value) => {
@@ -246,9 +263,18 @@ export class TuningPanel {
     this.vector(target, light.target.position, invalidateShadow, -15, 15, 0.001)
 
     const shadow = folder.addFolder('Shadow')
-    this.boolean(shadow, 'Enabled', () => light.castShadow, (value) => {
-      light.castShadow = value
-    }, shadowUpdate)
+    this.boolean(shadow, 'Enabled', () => light.shadow.intensity > 0, (value) => {
+      if (value) {
+        light.shadow.intensity = this.shadowIntensityBeforeDisable.get(light) ?? 1
+        invalidateShadow()
+      } else {
+        if (light.shadow.intensity > 0) {
+          this.shadowIntensityBeforeDisable.set(light, light.shadow.intensity)
+        }
+        light.shadow.intensity = 0
+        syncLight()
+      }
+    })
     this.number(shadow, 'Bias', () => light.shadow.bias, (value) => {
       light.shadow.bias = value
     }, -0.01, 0.01, 0.00001, lightUpdate)
@@ -260,6 +286,7 @@ export class TuningPanel {
     }, 0, 10, 0.1, lightUpdate)
     this.number(shadow, 'Intensity', () => light.shadow.intensity, (value) => {
       light.shadow.intensity = value
+      if (value > 0) this.shadowIntensityBeforeDisable.set(light, value)
     }, 0, 1, 0.01, lightUpdate)
   }
 
@@ -492,7 +519,7 @@ export class TuningPanel {
           angleDegrees: MathUtils.radToDeg(light.angle),
           penumbra: light.penumbra,
           decay: light.decay,
-          castShadow: light.castShadow,
+          castShadow: light.shadow.intensity > 0,
           shadow: {
             bias: light.shadow.bias,
             normalBias: light.shadow.normalBias,
@@ -563,6 +590,7 @@ export class TuningPanel {
         coneLength: this.lightGizmos.getHelperLength(),
         translationSnap: this.lightGizmos.getTranslationSnap(),
       },
+      materialOverrides: this.materialInspector.captureOverrides(),
     }
   }
 

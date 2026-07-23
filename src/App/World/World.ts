@@ -23,6 +23,7 @@ export class World {
   constructor(
     renderer: WebGPURenderer,
     bathroomAsset: GLTF,
+    towelAsset: GLTF,
     readonly environmentSource: DataTexture,
   ) {
     this.scene.background = new Color(0x090909)
@@ -38,6 +39,7 @@ export class World {
     this.bathroom = new Bathroom(
       this.scene,
       bathroomAsset,
+      towelAsset,
       this.environmentTarget.texture,
       Math.min(renderer.getMaxAnisotropy(), 8),
     )
@@ -61,7 +63,7 @@ export class World {
 
     const spots = [
       {
-        color: 0xfff7db,
+        color: 0xfefef6,
         position: [
           3.486985882664326,
           3.3489054066360833,
