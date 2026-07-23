@@ -10,6 +10,12 @@ import {
   builtinAOContext,
   diffuseColor,
   float,
+  luminance,
+  materialClearcoat,
+  materialClearcoatRoughness,
+  materialIOR,
+  materialSpecularColor,
+  materialSpecularIntensity,
   metalness,
   mix,
   mrt,
@@ -22,12 +28,10 @@ import {
   screenUV,
   unpackRGBToNormal,
   uniform,
-  vec2,
   vec4,
   velocity,
 } from 'three/tsl'
 import { ao, type default as GTAONode } from 'three/addons/tsl/display/GTAONode.js'
-import { bloom, type default as BloomNode } from 'three/addons/tsl/display/BloomNode.js'
 import { ssr, type default as SSRNode } from 'three/addons/tsl/display/SSRNode.js'
 import { ssgi, type default as SSGINode } from 'three/addons/tsl/display/SSGINode.js'
 import { traa, type default as TRAANode } from 'three/addons/tsl/display/TRAANode.js'
@@ -39,19 +43,17 @@ export class PostProcessing {
   readonly ssrPass: SSRNode
   readonly ssgiPass: SSGINode
   readonly taaPass: TRAANode
-  readonly bloomPass: BloomNode
-  private readonly directBloomPass: BloomNode
   private readonly aoContribution = uniform(0.27)
   private readonly ssrContribution = uniform(1.03)
-  private readonly ssgiContribution = uniform(0.18)
+  private readonly dielectricBlur = uniform(2.15)
+  private readonly dielectricTextureBlend = uniform(0.5)
+  private readonly ssgiContribution = uniform(0.35)
+  private readonly roughContactBounce = uniform(2.1)
   private readonly saturationAmount = uniform(0.88)
   private readonly sharpenAmount = uniform(0.7)
   private readonly temporalOutput: ReturnType<typeof vec4>
   private readonly directOutput: ReturnType<typeof vec4>
-  private readonly temporalBloomOutput: ReturnType<typeof vec4>
-  private readonly directBloomOutput: ReturnType<typeof vec4>
   private taaEnabled = true
-  private bloomEnabled = false
 
   constructor(
     renderer: WebGPURenderer,
@@ -59,13 +61,36 @@ export class PostProcessing {
     camera: PerspectiveCamera,
     environment: Texture,
   ) {
+    const clearcoatWeight = materialClearcoat.clamp(0, 1)
+    const dielectricF0 = materialIOR
+      .sub(1)
+      .div(materialIOR.add(1))
+      .pow(2)
+      .mul(materialSpecularIntensity)
+      .mul(luminance(materialSpecularColor))
+      .clamp(0, 1)
+    const specularResponse = dielectricF0
+      .add(float(0.04).mul(clearcoatWeight).mul(dielectricF0.oneMinus()))
+      .clamp(0, 1)
+    const reflectionRoughness = mix(
+      roughness,
+      materialClearcoatRoughness,
+      clearcoatWeight,
+    )
+
     const gBuffer = pass(scene, camera)
     gBuffer.transparent = false
     gBuffer.setMRT(
       mrt({
         output: packNormalToRGB(normalView),
         diffuse: diffuseColor,
-        metalRough: vec2(metalness, roughness),
+        // B stores dielectric F0 so rough non-metals can receive SSR.
+        metalRough: vec4(
+          metalness,
+          reflectionRoughness,
+          specularResponse,
+          clearcoatWeight,
+        ),
         velocity,
       }),
     )
@@ -104,16 +129,18 @@ export class PostProcessing {
     beautyPass.needsUpdate = true
 
     const beauty = beautyPass.getTextureNode()
+    const dielectricWeight = metalRough.r.oneMinus()
+    const ssrRoughness = mix(
+      metalRough.g,
+      metalRough.g.mul(this.dielectricBlur).clamp(0, 1),
+      dielectricWeight,
+    )
 
     this.ssrPass = ssr(beauty, depth, normal, {
       camera,
       stochastic: false,
-      metalnessNode: mix(
-        metalRough.g.oneMinus().pow(2).mul(0.04),
-        1,
-        metalRough.r,
-      ),
-      roughnessNode: metalRough.g,
+      metalnessNode: mix(metalRough.b, 1, metalRough.r),
+      roughnessNode: ssrRoughness,
       diffuseNode: diffuse,
       reflectNonMetals: true,
       environmentNode: environment,
@@ -130,12 +157,12 @@ export class PostProcessing {
     this.ssrPass.blurQuality = 1
 
     this.ssgiPass = ssgi(beauty, depth, normal, camera)
-    this.ssgiPass.giIntensity.value = 0.72
+    this.ssgiPass.giIntensity.value = 2.4
     this.ssgiPass.aoIntensity.value = 0
-    this.ssgiPass.radius.value = 0.9
-    this.ssgiPass.thickness.value = 0.1
-    this.ssgiPass.expFactor.value = 1.7
-    this.ssgiPass.backfaceLighting.value = 0.04
+    this.ssgiPass.radius.value = 1.25
+    this.ssgiPass.thickness.value = 0.08
+    this.ssgiPass.expFactor.value = 1.8
+    this.ssgiPass.backfaceLighting.value = 0.03
     this.ssgiPass.sliceCount.value = 2
     this.ssgiPass.stepCount.value = 8
     this.ssgiPass.useScreenSpaceSampling.value = true
@@ -143,10 +170,30 @@ export class PostProcessing {
     this.ssgiPass.useTemporalFiltering = true
 
     const gi = this.ssgiPass.getGINode()
+    const textureBlend = dielectricWeight
+      .mul(metalRough.g)
+      .mul(this.dielectricTextureBlend)
+      .clamp(0, 1)
+    const roughDielectricWeight = dielectricWeight.mul(metalRough.g)
+    const contactBounceScale = mix(
+      1,
+      this.roughContactBounce,
+      roughDielectricWeight,
+    )
+    const texturedReflection = mix(
+      this.ssrPass.rgb,
+      this.ssrPass.rgb.mul(diffuse.rgb.add(0.2)),
+      textureBlend,
+    )
     const composite = vec4(
       beauty.rgb
-        .add(this.ssrPass.rgb.mul(this.ssrContribution))
-        .add(diffuse.rgb.mul(gi.rgb).mul(this.ssgiContribution)),
+        .add(texturedReflection.mul(this.ssrContribution))
+        .add(
+          diffuse.rgb
+            .mul(gi.rgb)
+            .mul(this.ssgiContribution)
+            .mul(contactBounceScale),
+        ),
       beauty.a,
     )
     const graded = vec4(
@@ -205,19 +252,6 @@ export class PostProcessing {
       filteredDirect.a,
     )
 
-    this.bloomPass = bloom(this.temporalOutput, 0.12, 0.35, 1.1)
-    this.directBloomPass = bloom(this.directOutput, 0.12, 0.35, 1.1)
-    this.bloomPass.setResolutionScale(0.25)
-    this.directBloomPass.setResolutionScale(0.25)
-    this.temporalBloomOutput = vec4(
-      this.temporalOutput.rgb.add(this.bloomPass.rgb),
-      this.temporalOutput.a,
-    )
-    this.directBloomOutput = vec4(
-      this.directOutput.rgb.add(this.directBloomPass.rgb),
-      this.directOutput.a,
-    )
-
     this.pipeline = new RenderPipeline(renderer)
     this.pipeline.outputNode = this.temporalOutput
   }
@@ -237,63 +271,10 @@ export class PostProcessing {
     this.updateOutputNode()
   }
 
-  isBloomEnabled(): boolean {
-    return this.bloomEnabled
-  }
-
-  setBloomEnabled(enabled: boolean): void {
-    if (this.bloomEnabled === enabled) return
-
-    this.bloomEnabled = enabled
-    this.updateOutputNode()
-  }
-
-  getBloomStrength(): number {
-    return this.bloomPass.strength.value
-  }
-
-  setBloomStrength(value: number): void {
-    this.bloomPass.strength.value = value
-    this.directBloomPass.strength.value = value
-  }
-
-  getBloomRadius(): number {
-    return this.bloomPass.radius.value
-  }
-
-  setBloomRadius(value: number): void {
-    this.bloomPass.radius.value = value
-    this.directBloomPass.radius.value = value
-  }
-
-  getBloomThreshold(): number {
-    return this.bloomPass.threshold.value
-  }
-
-  setBloomThreshold(value: number): void {
-    this.bloomPass.threshold.value = value
-    this.directBloomPass.threshold.value = value
-  }
-
-  getBloomResolutionScale(): number {
-    return this.bloomPass.getResolutionScale()
-  }
-
-  setBloomResolutionScale(value: number): void {
-    this.bloomPass.setResolutionScale(value)
-    this.directBloomPass.setResolutionScale(value)
-  }
-
   private updateOutputNode(): void {
-    if (this.taaEnabled) {
-      this.pipeline.outputNode = this.bloomEnabled
-        ? this.temporalBloomOutput
-        : this.temporalOutput
-    } else {
-      this.pipeline.outputNode = this.bloomEnabled
-        ? this.directBloomOutput
-        : this.directOutput
-    }
+    this.pipeline.outputNode = this.taaEnabled
+      ? this.temporalOutput
+      : this.directOutput
     this.pipeline.needsUpdate = true
   }
 
@@ -317,12 +298,36 @@ export class PostProcessing {
     this.ssrContribution.value = value
   }
 
+  getDielectricBlur(): number {
+    return this.dielectricBlur.value
+  }
+
+  setDielectricBlur(value: number): void {
+    this.dielectricBlur.value = value
+  }
+
+  getDielectricTextureBlend(): number {
+    return this.dielectricTextureBlend.value
+  }
+
+  setDielectricTextureBlend(value: number): void {
+    this.dielectricTextureBlend.value = value
+  }
+
   getSsgiContribution(): number {
     return this.ssgiContribution.value
   }
 
   setSsgiContribution(value: number): void {
     this.ssgiContribution.value = value
+  }
+
+  getRoughContactBounce(): number {
+    return this.roughContactBounce.value
+  }
+
+  setRoughContactBounce(value: number): void {
+    this.roughContactBounce.value = value
   }
 
   getSaturation(): number {

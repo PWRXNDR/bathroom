@@ -1,4 +1,5 @@
 import {
+  Color,
   DoubleSide,
   Euler,
   Group,
@@ -12,6 +13,14 @@ import {
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js'
 
 export type SurfaceMaterial = MeshStandardMaterial | MeshPhysicalMaterial
+
+type ScreenSpaceSurfaceMaterial = SurfaceMaterial & {
+  ior: number
+  specularIntensity: number
+  specularColor: Color
+  clearcoat: number
+  clearcoatRoughness: number
+}
 
 interface MaterialTuning {
   color: string
@@ -176,6 +185,27 @@ const MATERIAL_TUNING: Record<string, MaterialTuning> = {
     specularIntensity: 0.55,
     specularColor: '#ffffff',
   },
+  dourado: {
+    color: '#ffffff',
+    roughness: 1,
+    metalness: 0.132,
+    normalScale: [1, -1],
+    aoIntensity: 1,
+    localEnvironment: false,
+    envMapIntensity: 0.14,
+    opacity: 1,
+    transparent: false,
+    depthWrite: true,
+    emissive: '#000000',
+    emissiveIntensity: 1,
+    transmission: 0,
+    ior: 1.5,
+    thickness: 0,
+    clearcoat: 0,
+    clearcoatRoughness: 0,
+    specularIntensity: 0.55,
+    specularColor: '#ffffff',
+  },
   'black-hammertone-301x300bijgewerkt': {
     color: '#25282a',
     roughness: 0.053,
@@ -199,8 +229,8 @@ const MATERIAL_TUNING: Record<string, MaterialTuning> = {
   },
   '2011.14_highres': {
     color: '#ffffff',
-    roughness: 0.359,
-    metalness: 0.022,
+    roughness: 0.681,
+    metalness: 0.061,
     normalScale: [1, -1],
     aoIntensity: 1,
     localEnvironment: true,
@@ -211,12 +241,12 @@ const MATERIAL_TUNING: Record<string, MaterialTuning> = {
     emissive: '#000000',
     emissiveIntensity: 1,
     transmission: 0,
-    ior: 1.5,
+    ior: 1000,
     thickness: 0,
     clearcoat: 0,
     clearcoatRoughness: 0,
-    specularIntensity: 0.55,
-    specularColor: '#ffffff',
+    specularIntensity: 0.081,
+    specularColor: '#cacaca',
   },
   '88775-bl-b1': {
     color: '#ffffff',
@@ -302,6 +332,7 @@ export class Bathroom {
         prepared.add(material)
         this.normalizePhysicalMaterial(material)
         this.repairConvertedMaterial(material)
+        this.prepareScreenSpaceMaterial(material)
         this.improveTextureFiltering(material)
       }
     })
@@ -319,6 +350,20 @@ export class Bathroom {
     material.ior = 1.5
     material.specularIntensity = 0.55
     material.specularColor.setHex(0xffffff)
+  }
+
+  private prepareScreenSpaceMaterial(material: SurfaceMaterial): void {
+    const surface = material as ScreenSpaceSurfaceMaterial
+
+    if (surface.ior === undefined) surface.ior = 1.5
+    if (surface.specularIntensity === undefined) surface.specularIntensity = 1
+    if (surface.specularColor === undefined) {
+      surface.specularColor = new Color(0xffffff)
+    }
+    if (surface.clearcoat === undefined) surface.clearcoat = 0
+    if (surface.clearcoatRoughness === undefined) {
+      surface.clearcoatRoughness = 0
+    }
   }
 
   private improveTextureFiltering(material: SurfaceMaterial): void {
