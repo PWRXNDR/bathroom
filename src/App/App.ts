@@ -2,11 +2,13 @@ import { AdaptiveQuality } from './AdaptiveQuality'
 import { Camera } from './Camera'
 import { PostProcessing } from './PostProcessing'
 import { Renderer } from './Renderer'
+import { TuningPanel } from './UI/TuningPanel'
 import { UI } from './UI/UI'
 import { Preloader } from './UI/Preloader'
 import { AssetLoader } from './Utils/AssetLoader'
 import { AssetStore } from './Utils/AssetStore'
 import { Sizes } from './Utils/Sizes'
+import { LightGizmos } from './World/LightGizmos'
 import { World } from './World/World'
 
 export class App {
@@ -22,10 +24,17 @@ export class App {
   private world: World | null = null
   private post: PostProcessing | null = null
   private quality: AdaptiveQuality | null = null
+  private lightGizmos: LightGizmos | null = null
+  private tuningPanel: TuningPanel | null = null
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new Renderer(canvas, this.sizes)
     this.camera = new Camera(canvas, this.sizes)
+    canvas.addEventListener('pointerdown', this.markActive, { passive: true })
+    canvas.addEventListener('pointermove', this.markPointerActive, {
+      passive: true,
+    })
+    canvas.addEventListener('wheel', this.markActive, { passive: true })
     this.camera.controls.addEventListener('change', this.markActive)
   }
 
@@ -46,13 +55,24 @@ export class App {
       assets.bathroom,
       assets.environment,
     )
+    this.lightGizmos = new LightGizmos(
+      this.world.scene,
+      this.camera.instance,
+      this.canvas,
+      this.camera.controls,
+      this.world.spotLights,
+      this.markActive,
+    )
     this.post = new PostProcessing(
       this.renderer.instance,
       this.world.scene,
       this.camera.instance,
       this.world.environmentSource,
     )
-    this.quality = new AdaptiveQuality(this.renderer, this.post, this.sizes)
+    this.quality = new AdaptiveQuality(
+      this.renderer,
+      this.post,
+    )
 
     this.preloader.setProgress(0.97)
     await this.renderer.instance.compileAsync(
@@ -64,7 +84,17 @@ export class App {
 
     this.canvas.classList.add('is-ready')
     await this.preloader.complete()
+    this.preloader.dispose()
     this.ui.show()
+    this.tuningPanel = new TuningPanel({
+      renderer: this.renderer,
+      camera: this.camera,
+      world: this.world,
+      post: this.post,
+      quality: this.quality,
+      lightGizmos: this.lightGizmos,
+      onChange: this.markActive,
+    })
     this.lastRenderTime = performance.now()
     this.activeUntil = this.lastRenderTime + 6000
     this.renderer.instance.setAnimationLoop(this.tick)
@@ -75,7 +105,7 @@ export class App {
 
     const now = performance.now()
     const isActive = now < this.activeUntil
-    const targetFps = isActive ? 60 : 30
+    const targetFps = isActive ? 45 : 30
     const frameInterval = 1000 / targetFps
 
     if (now - this.lastRenderTime < frameInterval - 0.5) return
@@ -88,12 +118,32 @@ export class App {
         ? this.lastRenderTime + frameInterval
         : now
     this.camera.update()
-    if (isActive) this.quality.update(delta)
+    this.quality.update(delta)
+    this.lightGizmos?.update()
     this.post.render()
     this.ui.end(this.quality.getRenderScale())
   }
 
   private readonly markActive = (): void => {
     this.activeUntil = performance.now() + 1500
+  }
+
+  private readonly markPointerActive = (event: PointerEvent): void => {
+    if (event.buttons !== 0) this.markActive()
+  }
+
+  dispose(): void {
+    this.renderer.instance.setAnimationLoop(null)
+    this.canvas.removeEventListener('pointerdown', this.markActive)
+    this.canvas.removeEventListener('pointermove', this.markPointerActive)
+    this.canvas.removeEventListener('wheel', this.markActive)
+    this.camera.controls.removeEventListener('change', this.markActive)
+    this.tuningPanel?.dispose()
+    this.lightGizmos?.dispose()
+    this.camera.dispose()
+    this.world?.dispose()
+    this.ui.dispose()
+    this.preloader.dispose()
+    this.renderer.instance.dispose()
   }
 }

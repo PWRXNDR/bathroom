@@ -23,7 +23,7 @@ export class Renderer {
     })
     this.instance.outputColorSpace = SRGBColorSpace
     this.instance.toneMapping = AgXToneMapping
-    this.instance.toneMappingExposure = 0.75
+    this.instance.toneMappingExposure = 0.66
     this.instance.shadowMap.enabled = true
     this.instance.shadowMap.type = PCFSoftShadowMap
 

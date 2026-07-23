@@ -4,12 +4,12 @@ import {
   QUALITY_PROFILES,
   type QualityLevel,
 } from './Utils/Store'
-import type { Sizes } from './Utils/Sizes'
 
 const ORDER: QualityLevel[] = ['low', 'balanced', 'high']
 
 export class AdaptiveQuality {
-  private level: QualityLevel = 'balanced'
+  private level: QualityLevel = 'high'
+  private enabled = false
   private averageFrameMs = 1000 / 45
   private elapsed = 0
   private sampleTime = 0
@@ -18,12 +18,13 @@ export class AdaptiveQuality {
   constructor(
     private readonly renderer: Renderer,
     private readonly post: PostProcessing,
-    private readonly sizes: Sizes,
   ) {
     this.apply(this.level)
   }
 
   update(frameSeconds: number): void {
+    if (!this.enabled) return
+
     const frameMs = Math.min(frameSeconds * 1000, 100)
     this.averageFrameMs += (frameMs - this.averageFrameMs) * 0.045
     this.elapsed += frameSeconds
@@ -43,7 +44,7 @@ export class AdaptiveQuality {
     }
 
     const balancedIndex = ORDER.indexOf('balanced')
-    if (fps > 52 && index < balancedIndex) {
+    if (fps > 40 && index < balancedIndex) {
       this.apply(ORDER[index + 1])
       this.cooldown = 12
     }
@@ -53,12 +54,27 @@ export class AdaptiveQuality {
     return this.renderer.getPixelRatio()
   }
 
+  isEnabled(): boolean {
+    return this.enabled
+  }
+
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled
+  }
+
+  getLevel(): QualityLevel {
+    return this.level
+  }
+
+  setLevel(level: QualityLevel): void {
+    this.apply(level)
+  }
+
   private apply(level: QualityLevel): void {
     this.level = level
     const profile = QUALITY_PROFILES[level]
-    const pixelRatio = Math.min(profile.pixelRatio, this.sizes.devicePixelRatio)
 
-    this.renderer.setPixelRatio(pixelRatio)
+    this.renderer.setPixelRatio(profile.pixelRatio)
     this.post.aoPass.resolutionScale = profile.aoResolution
     this.post.aoPass.samples.value = profile.aoSamples
     this.post.ssrPass.resolutionScale = profile.ssrResolution
