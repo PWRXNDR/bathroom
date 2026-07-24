@@ -1,5 +1,30 @@
 import { Vector3 } from 'three/webgpu'
 
+export type GpuProfileMode =
+  | 'full'
+  | 'no-gtao'
+  | 'no-ssr'
+  | 'no-ssgi'
+  | 'base'
+
+const GPU_PROFILE_MODES: readonly GpuProfileMode[] = [
+  'full',
+  'no-gtao',
+  'no-ssr',
+  'no-ssgi',
+  'base',
+]
+const requestedGpuProfile = new URLSearchParams(window.location.search).get(
+  'gpu-profile',
+)
+const isGpuProfileMode = (value: string | null): value is GpuProfileMode =>
+  value !== null && GPU_PROFILE_MODES.includes(value as GpuProfileMode)
+
+export const GPU_PROFILE = {
+  enabled: isGpuProfileMode(requestedGpuProfile),
+  mode: isGpuProfileMode(requestedGpuProfile) ? requestedGpuProfile : 'full',
+} as const
+
 export const ASSET_PATHS = {
   model: '/models/bathroom_decimated2_optimized.glb',
   towel: '/models/towel_optimized.glb',

@@ -6,6 +6,8 @@ export class UI {
   private readonly ms = new Stats()
   private readonly quality = new Stats()
   private readonly qualityPanel: Stats.Panel
+  private gpu: Stats | null = null
+  private gpuPanel: Stats.Panel | null = null
 
   constructor() {
     this.root.className = 'stats-stack'
@@ -26,10 +28,26 @@ export class UI {
     this.ms.begin()
   }
 
-  end(renderScale: number): void {
+  end(renderScale: number, gpuTime: number | null): void {
     this.fps.end()
     this.ms.end()
     this.qualityPanel.update(Math.round(renderScale * 100), 200)
+
+    if (gpuTime !== null && this.gpuPanel) {
+      this.gpuPanel.update(gpuTime, 40)
+      this.root.dataset.gpuMs = gpuTime.toFixed(3)
+    }
+  }
+
+  enableGpuPanel(label = 'GPU MS'): void {
+    if (this.gpu) return
+
+    this.gpu = new Stats()
+    this.gpuPanel = this.gpu.addPanel(
+      new Stats.Panel(label.toUpperCase(), '#f8f', '#212'),
+    )
+    this.gpu.showPanel(3)
+    this.root.append(this.gpu.dom)
   }
 
   show(): void {

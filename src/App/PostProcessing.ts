@@ -27,6 +27,7 @@ import {
   saturation,
   screenUV,
   unpackRGBToNormal,
+  vec3,
   vec4,
   velocity,
 } from 'three/tsl'
@@ -35,6 +36,7 @@ import { ssr, type default as SSRNode } from 'three/addons/tsl/display/SSRNode.j
 import { ssgi, type default as SSGINode } from 'three/addons/tsl/display/SSGINode.js'
 import { traa, type default as TRAANode } from 'three/addons/tsl/display/TRAANode.js'
 import { sharpen } from 'three/addons/tsl/display/SharpenNode.js'
+import type { GpuProfileMode } from './Utils/Store'
 
 const AO_CONTRIBUTION = 0.771
 const SSR_CONTRIBUTION = 1.03
@@ -54,7 +56,11 @@ export class PostProcessing {
     scene: Scene,
     camera: PerspectiveCamera,
     environment: Texture,
+    profileMode: GpuProfileMode = 'full',
   ) {
+    const includeGtao = profileMode !== 'no-gtao'
+    const includeSsr = profileMode !== 'no-ssr' && profileMode !== 'base'
+    const includeSsgi = profileMode !== 'no-ssgi' && profileMode !== 'base'
     const clearcoatWeight = materialClearcoat.clamp(0, 1)
     const dielectricF0 = materialIOR
       .sub(1)
@@ -113,13 +119,15 @@ export class PostProcessing {
     aoPass.useTemporalFiltering = true
 
     const beautyPass = pass(scene, camera)
-    beautyPass.contextNode = builtinAOContext(
-      mix(
-        1,
-        aoPass.getTextureNode().sample(screenUV).r,
-        AO_CONTRIBUTION,
-      ),
-    )
+    if (includeGtao) {
+      beautyPass.contextNode = builtinAOContext(
+        mix(
+          1,
+          aoPass.getTextureNode().sample(screenUV).r,
+          AO_CONTRIBUTION,
+        ),
+      )
+    }
     beautyPass.needsUpdate = true
 
     const beauty = beautyPass.getTextureNode()
@@ -179,15 +187,19 @@ export class PostProcessing {
       ssrPass.rgb.mul(diffuse.rgb.add(0.2)),
       textureBlend,
     )
+    const reflectionContribution = includeSsr
+      ? texturedReflection.mul(SSR_CONTRIBUTION)
+      : vec3(0)
+    const giContribution = includeSsgi
+      ? diffuse.rgb
+          .mul(gi.rgb)
+          .mul(SSGI_CONTRIBUTION)
+          .mul(contactBounceScale)
+      : vec3(0)
     const composite = vec4(
       beauty.rgb
-        .add(texturedReflection.mul(SSR_CONTRIBUTION))
-        .add(
-          diffuse.rgb
-            .mul(gi.rgb)
-            .mul(SSGI_CONTRIBUTION)
-            .mul(contactBounceScale),
-        ),
+        .add(reflectionContribution)
+        .add(giContribution),
       beauty.a,
     )
     const graded = vec4(

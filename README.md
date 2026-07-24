@@ -14,6 +14,7 @@
 - Исходная модель: 25.94 → 4.95 MiB, 2072 → 77 mesh nodes, текстуры в KTX2, геометрия в Draco.
 - Более 60 FPS без ограничения на ноутбуке, 44–45 FPS на Galaxy S23 Ultra, 39–44 FPS на iPhone 13 с iOS 26.
 - Adaptive quality: render scale 1.25–1.75 по измеренной частоте кадров.
+- GPU profiling: timestamp queries через WebGPU, полный pipeline занимает в среднем 13.623 ms на RTX 5060 Laptop при фиксированном render scale 1.25.
 - Не решено до конца: изоляция отражения зеркала от base material response.
 
 Подробности по каждому пункту ниже.
@@ -49,6 +50,7 @@ npm run preview
 | Tone Mapping | Выполнено | ACES, exposure 0.668 |
 | Минимум 30 FPS | Выполнено с запасом | более 60 FPS без ограничения при зафиксированном render scale 1.25, финальная частота намеренно ограничена |
 | Адаптивное качество | Выполнено | Runtime pixel ratio меняется от 1.25 до 1.75 по измеренной частоте кадров, idle cap исключён из оценки |
+| GPU profiling | Выполнено | При поддержке `timestamp-query` WebGPU измеряет реальное GPU время render passes, результат показывается четвёртой панелью `stats.js` |
 | Готовность к Vercel | Выполнено | Есть `vercel.json`, production команда и SPA rewrite |
 
 ## Архитектура
@@ -56,11 +58,11 @@ npm run preview
 Структура специально оставлена небольшой:
 
 - `App.ts` управляет загрузкой, жизненным циклом и частотой кадров.
-- `Renderer.ts` инициализирует WebGPU, цветовое пространство, tone mapping и тени.
+- `Renderer.ts` инициализирует WebGPU, цветовое пространство, tone mapping, тени и GPU timestamp queries.
 - `World.ts` собирает сцену, HDRI и источники света.
 - `Bathroom.ts` загружает две оптимизированные GLB модели и нормализует материалы после конвертации.
 - `PostProcessing.ts` содержит G-buffer и весь render pipeline.
-- `UI.ts` содержит три панели `stats.js`: FPS, CPU frame time и render scale.
+- `UI.ts` содержит три постоянные панели `stats.js`: FPS, CPU frame time и render scale. Четвёртая панель с GPU milliseconds добавляется только при поддержке `timestamp-query`.
 - `Preloader.ts` показывает круг загрузки без текста и дополнительного интерфейса.
 
 ## Render pipeline
@@ -112,6 +114,7 @@ ACES даёт более близкую к референсу глубину т�
 - SSR особенно заметен на зеркале, металле и глянцевой плитке. Для шероховатых неметаллических поверхностей отражение дополнительно смешивается с albedo, поэтому оно выглядит частью материала, а не отдельной глянцевой плёнкой.
 - SSGI добавляет мягкий локальный перенос цвета между близкими поверхностями, например рядом с сантехникой и полотенцем.
 - TAA оказался оправданным дополнением. Без temporal accumulation SSR и SSGI заметно шумели при движении камеры.
+- GPU timestamp queries дают фактическую длительность работы GPU, а не только CPU время отправки команд. Профиль полного pipeline и варианты с отключёнными passes снимаются автоматически при одинаковой камере, разрешении и render scale.
 - Камера свободно вращается, двигается и масштабируется через `OrbitControls`, стартовая позиция сразу находится внутри ванной.
 - Adaptive quality автоматически снижает render scale при частоте ниже 38 FPS и постепенно возвращает качество при стабильных 43 FPS и выше. Это позволяет одной сборке адаптироваться к производительности конкретного устройства, не реагируя ошибочно на намеренный idle cap.
 - Без искусственного ограничения сцена в проведённых тестах работала более чем на 60 FPS при зафиксированном render scale 1.25, то есть с framebuffer выше разрешения CSS viewport. В финальной сборке частота намеренно ограничена до 45 FPS во время взаимодействия и до 30 FPS после паузы. Это уменьшает энергопотребление и нагрев, а не маскирует нехватку производительности.
@@ -178,6 +181,60 @@ SSR и SSGI работают только с данными текущего э�
 - 30 FPS после перехода в idle режим, также из-за намеренного cap
 - примерно 4–8 ms CPU frame time по панели `stats.js`
 
+### GPU timestamp profiling
+
+`WebGPURenderer` запускается с `trackTimestamp: true`. Если адаптер поддерживает feature `timestamp-query`, WebGPU backend создаёт `GPUQuerySet` типа `timestamp`, записывает начало и конец render passes, выполняет `resolveQuerySet` в GPU buffer и после асинхронного readback переводит наносекунды в миллисекунды. В сцене результат отображается отдельной панелью `GPU MS`. Если feature недоступна, приложение продолжает работать без этой панели.
+
+Для воспроизводимого сравнения добавлен профильный режим. Он фиксирует render scale на 1.25, отключает adaptive quality, сохраняет ту же камеру, свет, ассеты и framebuffer размер 1920 × 1080 CSS pixels. Скрипт делает 12 timestamp samples для каждой конфигурации и сохраняет исходные значения в [`docs/gpu-profile-results.json`](docs/gpu-profile-results.json):
+
+```bash
+# В первом терминале
+npm run dev -- --host 127.0.0.1
+
+# Во втором терминале
+npm run profile:gpu
+```
+
+Замер выполнен 24 июля 2026 года в Chrome 150 на NVIDIA GeForce RTX 5060 Laptop GPU. Это GPU время всего активного render graph для кадра, а не изолированный synthetic benchmark одного shader:
+
+| Конфигурация | Среднее GPU время | Диапазон | Разница с full |
+| --- | ---: | ---: | ---: |
+| Full: G-buffer + GTAO + beauty + SSR + SSGI + TAA | 13.623 ms | 13.540–13.723 ms | — |
+| Без GTAO | 13.254 ms | 12.947–13.810 ms | −0.369 ms |
+| Без SSR | 7.343 ms | 7.222–7.759 ms | −6.280 ms |
+| Без SSGI | 10.679 ms | 10.455–10.828 ms | −2.944 ms |
+| Base: G-buffer + GTAO + beauty + TAA | 4.127 ms | 4.038–4.287 ms | −9.496 ms |
+
+13.623 ms полного graph соответствует примерно 73.4 кадра GPU работы в секунду, но это не обещание итоговых 73.4 FPS: CPU submission, browser compositor, дисплей и намеренный runtime cap учитываются отдельно. Дельты показывают, что в этой сцене самым дорогим экранным эффектом является SSR, затем SSGI, а GTAO занимает относительно небольшую часть бюджета. Значения нельзя складывать как полностью независимые costs: TSL удаляет неиспользуемые ветки graph, passes используют общие входные textures, а нагрузка GPU нелинейна. Поэтому таблица показывает честные A/B конфигурации, а не заявляет точную изоляцию каждого shader.
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/images/gpu-profile-full.jpg" width="100%" alt="Полный WebGPU pipeline, GPU timestamp 14 ms">
+      <br><sub>Full pipeline, среднее 13.623 ms GPU</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/images/gpu-profile-no-gtao.jpg" width="100%" alt="WebGPU pipeline без GTAO, GPU timestamp 14 ms">
+      <br><sub>Без GTAO, среднее 13.254 ms GPU</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/images/gpu-profile-no-ssr.jpg" width="100%" alt="WebGPU pipeline без SSR, GPU timestamp 8 ms">
+      <br><sub>Без SSR, среднее 7.343 ms GPU</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/images/gpu-profile-no-ssgi.jpg" width="100%" alt="WebGPU pipeline без SSGI, GPU timestamp 12 ms">
+      <br><sub>Без SSGI, среднее 10.679 ms GPU</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/images/gpu-profile-base.jpg" width="78%" alt="Базовый WebGPU pipeline, GPU timestamp 4 ms">
+  <br><sub>Base без SSR и SSGI, среднее 4.127 ms GPU</sub>
+</p>
+
 RTX 5060 Laptop является достаточно мощной дискретной видеокартой. Этот результат показывает запас на high-end ноутбуке, но сам по себе не является доказательством такой же производительности на iPad-class устройствах.
 
 Для более чёткой картинки на high-DPI экранах runtime render scale адаптивно меняется от 1.25 до 1.75. В этом проекте render scale является итоговым значением `WebGPURenderer.setPixelRatio`, а не множителем поверх системного `devicePixelRatio`. Поэтому на телефоне при scale 1.25 framebuffer имеет размер CSS viewport × 1.25, даже если DPR самого экрана равен 3 или больше. Во время взаимодействия scale уменьшается, если измеренная частота опускается ниже 38 FPS, и постепенно восстанавливается при стабильных 43 FPS и выше. Намеренный idle cap 30 FPS в эту оценку не входит, поэтому пауза пользователя не снижает качество сцены.
@@ -204,7 +261,7 @@ RTX 5060 Laptop является достаточно мощной дискре�
 - SSAO, SSR и SSGI экранные по своей природе. Они не видят закрытую или находящуюся за пределами кадра геометрию.
 - Прозрачное стекло не участвует в opaque G-buffer так же, как обычная поверхность. Это ограничивает вклад стекла в screen space GI и reflections.
 - WebGPU fallback на WebGL2 потребовал бы отдельной реализации части TSL passes и другого postprocessing graph. Простого переключения renderer здесь недостаточно.
-- GPU timestamps доступны не во всех браузерах и backend конфигурациях, поэтому в финальном интерфейсе оставлен стабильный CPU счётчик `stats.js`.
+- GPU timestamps доступны не во всех браузерах и backend конфигурациях. Поэтому GPU панель включается условно, а стабильные FPS, CPU frame time и render scale панели остаются доступными независимо от этой feature.
 
 ## Что я бы сделал дальше
 
@@ -212,7 +269,7 @@ RTX 5060 Laptop является достаточно мощной дискре�
 
 1. Добавить более строгий temporal history rejection и spatial denoiser для SSGI и SSR.
 2. Сделать LOD для полотенца и нескольких мелких круглых деталей, где всё ещё много геометрии.
-3. Добавить GPU timestamp profiling с разбивкой стоимости по passes и сравнить результаты в Windows/Chrome, Android/Chrome и iPad/Safari.
+3. Расширить уже добавленный GPU timestamp profiling отдельными markers вокруг каждого compute/render pass и сравнить результаты в Windows/Chrome, Android/Chrome и iPad/Safari.
 4. Перевести управление passes в небольшой render graph с переиспользованием transient attachments.
 5. Проверить adaptive quality на iPad/Safari и более слабых мобильных GPU, затем оформить проверенные пороги в отдельный облегчённый quality preset.
 6. Изолировать отражение зеркала от base material response через отдельную маску или слой композита. Для high-end профиля также проверить выборочный planar mirror или локальный reflection probe.

@@ -2,6 +2,7 @@ import {
   ACESFilmicToneMapping,
   PCFShadowMap,
   SRGBColorSpace,
+  TimestampQuery,
   WebGPURenderer,
 } from 'three/webgpu'
 import WebGPU from 'three/addons/capabilities/WebGPU.js'
@@ -14,6 +15,7 @@ export class Renderer {
   readonly instance: WebGPURenderer
   private pixelRatio = 1
   private readonly maxPixelRatio: number
+  private gpuTimestampsSupported = false
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -28,6 +30,7 @@ export class Renderer {
       antialias: false,
       alpha: false,
       powerPreference: 'high-performance',
+      trackTimestamp: true,
     })
     this.instance.outputColorSpace = SRGBColorSpace
     this.instance.toneMapping = ACESFilmicToneMapping
@@ -50,6 +53,7 @@ export class Renderer {
       throw new Error('WebGPU backend initialization failed')
     }
 
+    this.gpuTimestampsSupported = this.instance.hasFeature('timestamp-query')
     this.setPixelRatio(this.maxPixelRatio)
   }
 
@@ -67,6 +71,19 @@ export class Renderer {
 
   getPixelRatio(): number {
     return this.pixelRatio
+  }
+
+  supportsGpuTimestamps(): boolean {
+    return this.gpuTimestampsSupported
+  }
+
+  async resolveGpuTime(): Promise<number | null> {
+    if (!this.gpuTimestampsSupported) return null
+
+    const duration = await this.instance.resolveTimestampsAsync(
+      TimestampQuery.RENDER,
+    )
+    return duration !== undefined && Number.isFinite(duration) ? duration : null
   }
 
   private resize(): void {
