@@ -7,6 +7,9 @@ import {
 import WebGPU from 'three/addons/capabilities/WebGPU.js'
 import type { Sizes } from './Utils/Sizes'
 
+const MIN_RENDER_SCALE = 1.25
+const MAX_RENDER_SCALE = 1.75
+
 export class Renderer {
   readonly instance: WebGPURenderer
   private pixelRatio = 1
@@ -42,7 +45,11 @@ export class Renderer {
       throw new Error('WebGPU backend initialization failed')
     }
 
-    this.setPixelRatio(1.25)
+    const renderScale = Math.min(
+      Math.max(window.devicePixelRatio, MIN_RENDER_SCALE),
+      MAX_RENDER_SCALE,
+    )
+    this.setPixelRatio(renderScale)
   }
 
   setPixelRatio(pixelRatio: number): void {
