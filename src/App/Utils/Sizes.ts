@@ -10,6 +10,7 @@ export class Sizes {
     this.width = Math.max(window.innerWidth, 1)
     this.height = Math.max(window.innerHeight, 1)
 
+    // Все подписчики получают одинаковые размеры окна.
     for (const handler of this.handlers) {
       handler(this.width, this.height)
     }

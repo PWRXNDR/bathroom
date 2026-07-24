@@ -78,13 +78,14 @@ export class PostProcessing {
       clearcoatWeight,
     )
 
+    // G-buffer хранит данные поверхности для экранных эффектов.
     const gBuffer = pass(scene, camera)
     gBuffer.transparent = false
     gBuffer.setMRT(
       mrt({
         output: packNormalToRGB(normalView),
         diffuse: diffuseColor,
-        // B stores dielectric F0 so rough non-metals can receive SSR.
+        // В канале B хранится отражение неметаллических поверхностей.
         metalRough: vec4(
           metalness,
           reflectionRoughness,
@@ -120,6 +121,7 @@ export class PostProcessing {
 
     const beautyPass = pass(scene, camera)
     if (includeGtao) {
+      // GTAO затемняет только окружающее освещение.
       beautyPass.contextNode = builtinAOContext(
         mix(
           1,
@@ -187,6 +189,7 @@ export class PostProcessing {
       ssrPass.rgb.mul(diffuse.rgb.add(0.2)),
       textureBlend,
     )
+    // SSR смешивается с цветом шероховатых поверхностей.
     const reflectionContribution = includeSsr
       ? texturedReflection.mul(SSR_CONTRIBUTION)
       : vec3(0)
@@ -206,6 +209,7 @@ export class PostProcessing {
       saturation(composite.rgb, SATURATION),
       composite.a,
     )
+    // Перед TAA сжимаем HDR диапазон для защиты от ярких точек.
     const temporalInputRgb = graded.rgb.max(0)
     const temporalPeak = temporalInputRgb.r
       .max(temporalInputRgb.g)
@@ -235,6 +239,7 @@ export class PostProcessing {
     const inverseDenominator = float(1)
       .sub(stablePeak)
       .max(0.02)
+    // После фильтрации восстанавливаем безопасный HDR диапазон.
     const temporalOutput = vec4(
       stableRgb.div(inverseDenominator),
       filteredTemporal.a,

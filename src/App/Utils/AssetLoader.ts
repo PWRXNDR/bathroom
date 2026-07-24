@@ -31,6 +31,7 @@ export class AssetLoader {
     renderer: WebGPURenderer,
     private readonly onProgress: ProgressHandler,
   ) {
+    // Draco декодирует геометрию, KTX2 подбирает формат текстур для GPU.
     this.dracoLoader.setDecoderPath(ASSET_PATHS.draco).setWorkerLimit(3)
     this.ktx2Loader
       .setTranscoderPath(ASSET_PATHS.basis)
@@ -42,6 +43,7 @@ export class AssetLoader {
   }
 
   async load(): Promise<LoadedAssets> {
+    // Основные ресурсы загружаются параллельно.
     const [bathroom, towel, environment] = await Promise.all([
       this.loadGLTF(ASSET_PATHS.model),
       this.loadGLTF(ASSET_PATHS.towel),
@@ -78,6 +80,7 @@ export class AssetLoader {
   }
 
   private updateProgress(url: string, event: ProgressEvent<EventTarget>): void {
+    // Прогресс считается по загруженным байтам всех ресурсов.
     const current = this.progress.get(url)
     const total = event.lengthComputable
       ? event.total

@@ -52,6 +52,7 @@ export class App {
   }
 
   async init(): Promise<void> {
+    // Сначала готовим WebGPU, затем загружаем сцену и постобработку.
     this.preloader.setProgress(0.02)
     await this.renderer.init()
     if (GPU_PROFILE.enabled) this.renderer.setPixelRatio(1.25)
@@ -104,6 +105,7 @@ export class App {
     if (!this.post) return
 
     const now = performance.now()
+    // Во время движения рендерим чаще, в покое снижаем нагрузку.
     const isActive = now < this.activeUntil
     const targetFps = isActive ? ACTIVE_FPS : IDLE_FPS
     const frameInterval = 1000 / targetFps
@@ -124,6 +126,7 @@ export class App {
   }
 
   private updateGpuTime(now: number): void {
+    // Читаем время GPU редко, чтобы замер не создавал лишнюю нагрузку.
     if (
       this.gpuQueryPending ||
       now < this.nextGpuQueryTime ||
@@ -152,6 +155,7 @@ export class App {
   private updateAdaptiveQuality(now: number, isActive: boolean): void {
     if (GPU_PROFILE.enabled) return
 
+    // Режим покоя не должен влиять на оценку качества.
     if (!isActive) {
       this.qualitySampleStart = now
       this.qualityFrameCount = 0

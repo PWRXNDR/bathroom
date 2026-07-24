@@ -25,6 +25,7 @@ export class Renderer {
       Math.max(window.devicePixelRatio, MIN_RENDER_SCALE),
       MAX_RENDER_SCALE,
     )
+    // Сглаживание выполняет TAA, поэтому MSAA здесь не нужен.
     this.instance = new WebGPURenderer({
       canvas,
       antialias: false,
@@ -48,6 +49,7 @@ export class Renderer {
 
     await this.instance.init()
 
+    // Проверяем, что запущен именно WebGPU backend.
     const backend = this.instance.backend as { isWebGPUBackend?: boolean }
     if (backend.isWebGPUBackend !== true) {
       throw new Error('WebGPU backend initialization failed')
@@ -80,6 +82,7 @@ export class Renderer {
   async resolveGpuTime(): Promise<number | null> {
     if (!this.gpuTimestampsSupported) return null
 
+    // Получаем время GPU для последнего завершённого кадра.
     const duration = await this.instance.resolveTimestampsAsync(
       TimestampQuery.RENDER,
     )

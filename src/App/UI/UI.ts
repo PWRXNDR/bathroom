@@ -42,6 +42,7 @@ export class UI {
   enableGpuPanel(label = 'GPU MS'): void {
     if (this.gpu) return
 
+    // Панель появляется только при поддержке timestamp queries.
     this.gpu = new Stats()
     this.gpuPanel = this.gpu.addPanel(
       new Stats.Panel(label.toUpperCase(), '#f8f', '#212'),

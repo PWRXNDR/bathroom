@@ -16,6 +16,7 @@ export class Camera {
     )
     this.instance.position.copy(CAMERA_PRESET.position)
 
+    // Управление похоже на навигацию во вьюпорте Blender.
     this.controls = new OrbitControls(this.instance, canvas)
     this.controls.target.copy(CAMERA_PRESET.target)
     this.controls.enableDamping = true

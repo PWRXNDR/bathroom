@@ -348,6 +348,7 @@ export class Bathroom {
   ) {
     this.model = new Group()
     this.model.name = 'Bathroom assets'
+    // Возвращаем модель в координаты настроенного света и камеры.
     gltf.scene.position.x += BATHROOM_EXPORT_OFFSET_X
     this.model.add(gltf.scene, towelGltf.scene)
     this.prepareMaterials()
@@ -357,6 +358,7 @@ export class Bathroom {
   private prepareMaterials(): void {
     const prepared = new Set<SurfaceMaterial>()
 
+    // Общие материалы обрабатываются только один раз.
     this.model.traverse((child) => {
       if (!(child instanceof Mesh)) return
 
@@ -499,6 +501,7 @@ export class Bathroom {
     }
 
     if (name.includes('mirror')) {
+      // Зеркалу нужны только параметры материала без текстур.
       this.removeMirrorTextures(material)
       material.color.setHex(0xffffff)
       material.emissive.setHex(0x000000)

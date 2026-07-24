@@ -1,6 +1,7 @@
 import './style.css'
 import { App } from './App/App'
 
+// Точка входа приложения.
 const canvas = document.querySelector<HTMLCanvasElement>('.experience')
 
 if (!canvas) {

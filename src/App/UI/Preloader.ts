@@ -51,6 +51,7 @@ export class Preloader {
   }
 
   private readonly tick = (): void => {
+    // Число и кольцо плавно догоняют реальный прогресс.
     const difference = this.target - this.displayed
     this.displayed += difference * (this.target >= 1 ? 0.2 : 0.09)
 

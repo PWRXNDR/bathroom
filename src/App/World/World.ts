@@ -28,6 +28,7 @@ export class World {
     this.scene.environmentRotation = new Euler(0, 0, 0)
 
     environmentSource.mapping = EquirectangularReflectionMapping
+    // PMREM подготавливает HDR окружение для PBR материалов.
     const pmrem = new PMREMGenerator(renderer)
     this.environmentTarget = pmrem.fromEquirectangular(environmentSource)
     this.scene.environment = this.environmentTarget.texture
@@ -49,6 +50,7 @@ export class World {
   }
 
   private addLights(): void {
+    // Три источника повторяют расположение света в референсе.
     const ambient = new AmbientLight(0xdde1e6, 0.095)
     ambient.name = 'Reference ambient fill'
     this.scene.add(ambient)
