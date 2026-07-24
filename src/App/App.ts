@@ -7,6 +7,12 @@ import { AssetLoader } from './Utils/AssetLoader'
 import { Sizes } from './Utils/Sizes'
 import { World } from './World/World'
 
+const ACTIVE_FPS = 45
+const IDLE_FPS = 30
+const QUALITY_SAMPLE_DURATION = 1500
+const QUALITY_FPS_LOW = 38
+const QUALITY_FPS_HIGH = 43
+
 export class App {
   private readonly sizes = new Sizes()
   private readonly preloader = new Preloader()
@@ -15,6 +21,8 @@ export class App {
   private readonly camera: Camera
   private lastRenderTime = performance.now()
   private activeUntil = performance.now() + 6000
+  private qualitySampleStart = performance.now()
+  private qualityFrameCount = 0
 
   private world: World | null = null
   private post: PostProcessing | null = null
@@ -66,6 +74,8 @@ export class App {
     this.ui.show()
     this.lastRenderTime = performance.now()
     this.activeUntil = this.lastRenderTime + 6000
+    this.qualitySampleStart = this.lastRenderTime
+    this.qualityFrameCount = 0
     this.renderer.instance.setAnimationLoop(this.tick)
   }
 
@@ -74,7 +84,7 @@ export class App {
 
     const now = performance.now()
     const isActive = now < this.activeUntil
-    const targetFps = isActive ? 45 : 30
+    const targetFps = isActive ? ACTIVE_FPS : IDLE_FPS
     const frameInterval = 1000 / targetFps
 
     if (now - this.lastRenderTime < frameInterval - 0.5) return
@@ -88,6 +98,31 @@ export class App {
     this.camera.update()
     this.post.render()
     this.ui.end(this.renderer.getPixelRatio())
+    this.updateAdaptiveQuality(now, isActive)
+  }
+
+  private updateAdaptiveQuality(now: number, isActive: boolean): void {
+    if (!isActive) {
+      this.qualitySampleStart = now
+      this.qualityFrameCount = 0
+      return
+    }
+
+    this.qualityFrameCount++
+    const elapsed = now - this.qualitySampleStart
+    if (elapsed < QUALITY_SAMPLE_DURATION) return
+
+    const measuredFps = (this.qualityFrameCount * 1000) / elapsed
+    const currentScale = this.renderer.getPixelRatio()
+
+    if (measuredFps < QUALITY_FPS_LOW) {
+      this.renderer.setPixelRatio(currentScale - 0.1)
+    } else if (measuredFps > QUALITY_FPS_HIGH) {
+      this.renderer.setPixelRatio(currentScale + 0.05)
+    }
+
+    this.qualitySampleStart = now
+    this.qualityFrameCount = 0
   }
 
   private readonly markActive = (): void => {

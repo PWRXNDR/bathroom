@@ -29,7 +29,7 @@ export class UI {
   end(renderScale: number): void {
     this.fps.end()
     this.ms.end()
-    this.qualityPanel.update(Math.round(renderScale * 100), 150)
+    this.qualityPanel.update(Math.round(renderScale * 100), 200)
   }
 
   show(): void {

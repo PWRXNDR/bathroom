@@ -13,11 +13,16 @@ const MAX_RENDER_SCALE = 1.75
 export class Renderer {
   readonly instance: WebGPURenderer
   private pixelRatio = 1
+  private readonly maxPixelRatio: number
 
   constructor(
     canvas: HTMLCanvasElement,
     private readonly sizes: Sizes,
   ) {
+    this.maxPixelRatio = Math.min(
+      Math.max(window.devicePixelRatio, MIN_RENDER_SCALE),
+      MAX_RENDER_SCALE,
+    )
     this.instance = new WebGPURenderer({
       canvas,
       antialias: false,
@@ -45,15 +50,17 @@ export class Renderer {
       throw new Error('WebGPU backend initialization failed')
     }
 
-    const renderScale = Math.min(
-      Math.max(window.devicePixelRatio, MIN_RENDER_SCALE),
-      MAX_RENDER_SCALE,
-    )
-    this.setPixelRatio(renderScale)
+    this.setPixelRatio(this.maxPixelRatio)
   }
 
   setPixelRatio(pixelRatio: number): void {
-    this.pixelRatio = Math.max(0.5, pixelRatio)
+    const nextPixelRatio = Math.min(
+      Math.max(pixelRatio, MIN_RENDER_SCALE),
+      this.maxPixelRatio,
+    )
+    if (Math.abs(nextPixelRatio - this.pixelRatio) < 0.001) return
+
+    this.pixelRatio = nextPixelRatio
     this.instance.setPixelRatio(this.pixelRatio)
     this.resize()
   }
