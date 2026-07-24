@@ -1,17 +1,14 @@
 import { Camera } from './Camera'
 import { PostProcessing } from './PostProcessing'
 import { Renderer } from './Renderer'
-import { SSAOPanel } from './UI/SSAOPanel'
 import { UI } from './UI/UI'
 import { Preloader } from './UI/Preloader'
 import { AssetLoader } from './Utils/AssetLoader'
-import { AssetStore } from './Utils/AssetStore'
 import { Sizes } from './Utils/Sizes'
 import { World } from './World/World'
 
 export class App {
   private readonly sizes = new Sizes()
-  private readonly assets = new AssetStore()
   private readonly preloader = new Preloader()
   private readonly ui = new UI()
   private readonly renderer: Renderer
@@ -21,7 +18,6 @@ export class App {
 
   private world: World | null = null
   private post: PostProcessing | null = null
-  private ssaoPanel: SSAOPanel | null = null
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new Renderer(canvas, this.sizes)
@@ -43,9 +39,7 @@ export class App {
       this.renderer.instance,
       (progress) => this.preloader.setProgress(0.08 + progress * 0.9),
     )
-    this.assets.set(await loader.load())
-
-    const assets = this.assets.get()
+    const assets = await loader.load()
     this.world = new World(
       this.renderer.instance,
       assets.bathroom,
@@ -57,12 +51,6 @@ export class App {
       this.world.scene,
       this.camera.instance,
       this.world.environmentSource,
-    )
-    this.ssaoPanel = new SSAOPanel(
-      this.post,
-      this.world,
-      this.renderer,
-      this.markActive,
     )
     this.preloader.setProgress(0.97)
     await this.renderer.instance.compileAsync(
@@ -116,7 +104,6 @@ export class App {
     this.canvas.removeEventListener('pointermove', this.markPointerActive)
     this.canvas.removeEventListener('wheel', this.markActive)
     this.camera.controls.removeEventListener('change', this.markActive)
-    this.ssaoPanel?.dispose()
     this.camera.dispose()
     this.world?.dispose()
     this.ui.dispose()

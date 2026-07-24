@@ -58,6 +58,69 @@ const MATERIAL_TUNING: Record<string, MaterialTuning> = {
     emissive: '#000000',
     emissiveIntensity: 1,
   },
+  silver: {
+    color: '#c8cccf',
+    roughness: 0.311,
+    metalness: 1,
+    normalScale: [1, -1],
+    aoIntensity: 1,
+    localEnvironment: true,
+    envMapIntensity: 0.27,
+    opacity: 1,
+    transparent: false,
+    depthWrite: true,
+    emissive: '#000000',
+    emissiveIntensity: 1,
+    transmission: 0,
+    ior: 1.5,
+    thickness: 0,
+    clearcoat: 0,
+    clearcoatRoughness: 0,
+    specularIntensity: 0.55,
+    specularColor: '#ffffff',
+  },
+  gray7: {
+    color: '#ced1d4',
+    roughness: 0.134,
+    metalness: 0.667,
+    normalScale: [1, -1],
+    aoIntensity: 1,
+    localEnvironment: true,
+    envMapIntensity: 0.18,
+    opacity: 1,
+    transparent: false,
+    depthWrite: true,
+    emissive: '#000000',
+    emissiveIntensity: 1,
+    transmission: 0,
+    ior: 1.5,
+    thickness: 0,
+    clearcoat: 0,
+    clearcoatRoughness: 0,
+    specularIntensity: 0.55,
+    specularColor: '#ffffff',
+  },
+  glass_pure: {
+    color: '#c4c4c4',
+    roughness: 0.419049,
+    metalness: 0,
+    normalScale: [1, -1],
+    aoIntensity: 1,
+    localEnvironment: true,
+    envMapIntensity: 0.08937,
+    opacity: 0.022857,
+    transparent: true,
+    depthWrite: false,
+    emissive: '#000000',
+    emissiveIntensity: 1,
+    transmission: 0,
+    ior: 1000,
+    thickness: 0,
+    clearcoat: 0,
+    clearcoatRoughness: 0,
+    specularIntensity: 1,
+    specularColor: '#959595',
+  },
   cream_ceramic: {
     color: '#f2f2f2',
     roughness: 0.344,
@@ -228,7 +291,7 @@ const MATERIAL_TUNING: Record<string, MaterialTuning> = {
   },
   '2011.14_highres': {
     color: '#ffffff',
-    roughness: 0.681,
+    roughness: 0.6,
     metalness: 0.061,
     normalScale: [1, -1],
     aoIntensity: 1,
@@ -391,7 +454,7 @@ export class Bathroom {
 
     if (name === '2011.14_highres') {
       material.color.setHex(0xffffff)
-      material.roughness = 0.66
+      material.roughness = 0.6
     }
 
     if (name === 'coolgray1') {
@@ -401,20 +464,6 @@ export class Bathroom {
     if (name === 'gray8') {
       material.color.setHex(0x4a4b4d)
       material.roughness = 0.65
-    }
-
-    if (name === 'gray7') {
-      material.color.setHex(0x898d90)
-      material.metalness = 0.65
-      material.roughness = POLISHED_ROUGHNESS
-      this.setEnvironmentStrength(material, 0.18)
-    }
-
-    if (name === 'silver') {
-      material.color.setHex(0xc8cccf)
-      material.metalness = 1
-      material.roughness = POLISHED_ROUGHNESS
-      this.setEnvironmentStrength(material, 0.27)
     }
 
     if (name.includes('chrome')) {

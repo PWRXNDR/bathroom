@@ -5,7 +5,12 @@ import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js'
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js'
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js'
 import { ASSET_PATHS } from './Store'
-import type { LoadedAssets } from './AssetStore'
+
+interface LoadedAssets {
+  bathroom: GLTF
+  towel: GLTF
+  environment: DataTexture
+}
 
 type ProgressHandler = (progress: number) => void
 

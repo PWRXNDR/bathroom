@@ -10,13 +10,13 @@ export const ASSET_PATHS = {
 
 export const CAMERA_PRESET = {
   position: new Vector3(
-    4.776145,
-    0.479259,
-    -3.681254,
+    4.383897,
+    1.482921,
+    -5.176851,
   ),
   target: new Vector3(
-    2.135028,
-    0.873405,
-    -3.9145,
+    2.26059,
+    1.547152,
+    -3.928228,
   ),
 } as const

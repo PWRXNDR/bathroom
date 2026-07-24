@@ -15,8 +15,6 @@ import { Bathroom } from './Bathroom'
 
 export class World {
   readonly scene = new Scene()
-  readonly ambientLight: AmbientLight
-  readonly spotLights: [SpotLight, SpotLight, SpotLight]
   private readonly environmentTarget: RenderTarget
 
   constructor(
@@ -26,7 +24,7 @@ export class World {
     readonly environmentSource: DataTexture,
   ) {
     this.scene.background = new Color(0x090909)
-    this.scene.environmentIntensity = 0.18
+    this.scene.environmentIntensity = 0.115
     this.scene.environmentRotation = new Euler(0, 0, 0)
 
     environmentSource.mapping = EquirectangularReflectionMapping
@@ -42,9 +40,7 @@ export class World {
       this.environmentTarget.texture,
       Math.min(renderer.getMaxAnisotropy(), 8),
     )
-    const lights = this.addLights()
-    this.ambientLight = lights.ambient
-    this.spotLights = lights.spots
+    this.addLights()
   }
 
   dispose(): void {
@@ -52,27 +48,16 @@ export class World {
     this.environmentSource.dispose()
   }
 
-  private addLights(): {
-    ambient: AmbientLight
-    spots: [SpotLight, SpotLight, SpotLight]
-  } {
-    const ambient = new AmbientLight(0xdde1e6, 0.2)
+  private addLights(): void {
+    const ambient = new AmbientLight(0xdde1e6, 0.095)
     ambient.name = 'Reference ambient fill'
     this.scene.add(ambient)
 
     const spots = [
       {
         color: 0xfefef6,
-        position: [
-          3.486986,
-          3.348905,
-          -3.717067,
-        ],
-        target: [
-          3.53221,
-          1.817959,
-          -3.538706,
-        ],
+        position: [3.486986, 3.348905, -3.717067],
+        target: [3.53221, 1.817959, -3.538706],
         intensity: 61.4,
         distance: 6.95,
         angle: 0.959931,
@@ -88,16 +73,8 @@ export class World {
       },
       {
         color: 0xfeeed7,
-        position: [
-          3.861837,
-          2.780811,
-          -4.716,
-        ],
-        target: [
-          3.795154,
-          1.812452,
-          -4.979415,
-        ],
+        position: [3.861837, 2.780811, -4.716],
+        target: [3.795154, 1.812452, -4.979415],
         intensity: 7.7,
         distance: 5.01,
         angle: 1.455605,
@@ -106,23 +83,15 @@ export class World {
         shadow: {
           bias: -0.00032,
           normalBias: 0.0142,
-          radius: 4.1,
+          radius: 6.3,
           intensity: 0.68,
           mapSize: [1024, 1024],
         },
       },
       {
         color: 0xffffff,
-        position: [
-          3.761743,
-          2.774935,
-          -3.353407,
-        ],
-        target: [
-          3.604851,
-          1.770426,
-          -2.664485,
-        ],
+        position: [3.761743, 2.774935, -3.353407],
+        target: [3.604851, 1.770426, -2.664485],
         intensity: 30,
         distance: 4.69,
         angle: 1.0088,
@@ -138,7 +107,7 @@ export class World {
       },
     ] as const
 
-    const spotLights = spots.map((settings, index) => {
+    spots.forEach((settings, index) => {
       const [x, y, z] = settings.position
       const [targetX, targetY, targetZ] = settings.target
       const spot = new SpotLight(
@@ -163,9 +132,6 @@ export class World {
       spot.shadow.needsUpdate = true
 
       this.scene.add(spot, spot.target)
-      return spot
-    }) as [SpotLight, SpotLight, SpotLight]
-
-    return { ambient, spots: spotLights }
+    })
   }
 }

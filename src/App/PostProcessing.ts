@@ -27,11 +27,10 @@ import {
   saturation,
   screenUV,
   unpackRGBToNormal,
-  uniform,
   vec4,
   velocity,
 } from 'three/tsl'
-import { ao, type default as GTAONode } from 'three/addons/tsl/display/GTAONode.js'
+import { ao } from 'three/addons/tsl/display/GTAONode.js'
 import { ssr, type default as SSRNode } from 'three/addons/tsl/display/SSRNode.js'
 import { ssgi, type default as SSGINode } from 'three/addons/tsl/display/SSGINode.js'
 import { traa, type default as TRAANode } from 'three/addons/tsl/display/TRAANode.js'
@@ -39,6 +38,7 @@ import { sharpen } from 'three/addons/tsl/display/SharpenNode.js'
 
 const AO_CONTRIBUTION = 0.771
 const SSR_CONTRIBUTION = 1.03
+const SSR_INTENSITY = 0.3
 const DIELECTRIC_BLUR = 2.15
 const DIELECTRIC_TEXTURE_BLEND = 0.5
 const SSGI_CONTRIBUTION = 0.35
@@ -48,8 +48,6 @@ const SHARPEN = 0.7
 
 export class PostProcessing {
   readonly pipeline: RenderPipeline
-  readonly aoPass: GTAONode
-  private readonly aoContribution = uniform(AO_CONTRIBUTION)
 
   constructor(
     renderer: WebGPURenderer,
@@ -104,22 +102,22 @@ export class PostProcessing {
     gBuffer.getTexture('diffuse').type = UnsignedByteType
     gBuffer.getTexture('metalRough').type = UnsignedByteType
 
-    this.aoPass = ao(depth, normal, camera)
-    this.aoPass.radius.value = 3.525
-    this.aoPass.thickness.value = 0.137
-    this.aoPass.distanceExponent.value = 1.75
-    this.aoPass.distanceFallOff.value = 0.43
-    this.aoPass.scale.value = 0.34
-    this.aoPass.samples.value = 14
-    this.aoPass.resolutionScale = 0.6
-    this.aoPass.useTemporalFiltering = true
+    const aoPass = ao(depth, normal, camera)
+    aoPass.radius.value = 3.525
+    aoPass.thickness.value = 0.137
+    aoPass.distanceExponent.value = 1.75
+    aoPass.distanceFallOff.value = 0.43
+    aoPass.scale.value = 0.34
+    aoPass.samples.value = 14
+    aoPass.resolutionScale = 0.6
+    aoPass.useTemporalFiltering = true
 
     const beautyPass = pass(scene, camera)
     beautyPass.contextNode = builtinAOContext(
       mix(
         1,
-        this.aoPass.getTextureNode().sample(screenUV).r,
-        this.aoContribution,
+        aoPass.getTextureNode().sample(screenUV).r,
+        AO_CONTRIBUTION,
       ),
     )
     beautyPass.needsUpdate = true
@@ -144,7 +142,7 @@ export class PostProcessing {
     })
     ssrPass.maxDistance.value = 6.92
     ssrPass.thickness.value = 0.085
-    ssrPass.intensity.value = 0.28
+    ssrPass.intensity.value = SSR_INTENSITY
     ssrPass.screenEdgeFade.value = 0.339
     ssrPass.maxLuminance.value = 5
     ssrPass.mirrorBias.value = 0.5
@@ -236,13 +234,5 @@ export class PostProcessing {
 
   render(): void {
     this.pipeline.render()
-  }
-
-  getAoContribution(): number {
-    return this.aoContribution.value
-  }
-
-  setAoContribution(value: number): void {
-    this.aoContribution.value = value
   }
 }
