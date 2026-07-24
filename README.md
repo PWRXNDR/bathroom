@@ -7,6 +7,17 @@
 - Репозиторий: [github.com/PWRXNDR/bathroom](https://github.com/PWRXNDR/bathroom)
 - Демо: [bathroom.dubralex.com](https://bathroom.dubralex.com)
 
+## Кратко
+
+- Vanilla Three.js r185, TypeScript и `WebGPURenderer`.
+- Пайплайн: G-buffer → GTAO → beauty → SSR → SSGI → HDR composite → TAA → ACES.
+- Исходная модель: 25.94 → 4.95 MiB, 2072 → 77 mesh nodes, текстуры в KTX2, геометрия в Draco.
+- Более 60 FPS без ограничения на ноутбуке, 44–45 FPS на Galaxy S23 Ultra, 39–44 FPS на iPhone 13 с iOS 26.
+- Adaptive quality: render scale 1.25–1.75 по измеренной частоте кадров.
+- Не решено до конца: изоляция отражения зеркала от base material response.
+
+Подробности по каждому пункту ниже.
+
 ## Запуск
 
 Требуется Node.js 22.12 или новее.
