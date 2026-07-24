@@ -478,14 +478,14 @@ export class Bathroom {
 
     if (name.includes('glass_pure')) {
       material.color.setRGB(
-        0.549019992351532,
-        0.549019992351532,
-        0.549019992351532,
+        0.54902,
+        0.54902,
+        0.54902,
       )
       material.metalness = 0
-      material.roughness = 0.41904890537261963
+      material.roughness = 0.419049
       material.transparent = true
-      material.opacity = 0.022857213392853737
+      material.opacity = 0.022857
       material.depthWrite = false
       material.side = DoubleSide
       material.forceSinglePass = false
@@ -495,9 +495,9 @@ export class Bathroom {
         material.ior = 1000
         material.specularIntensity = 1
         material.specularColor.setRGB(
-          0.3004954159259796,
-          0.3004954159259796,
-          0.3004954159259796,
+          0.300495,
+          0.300495,
+          0.300495,
         )
         material.transmission = 0
         material.thickness = 0
@@ -507,9 +507,9 @@ export class Bathroom {
 
     if (name.includes('vidro_difusor')) {
       material.color.setScalar(0.501961)
-      material.roughness = 0.1175686
+      material.roughness = 0.117569
       material.transparent = true
-      material.opacity = 0.0509804
+      material.opacity = 0.05098
       material.depthWrite = false
       material.side = DoubleSide
       material.forceSinglePass = true

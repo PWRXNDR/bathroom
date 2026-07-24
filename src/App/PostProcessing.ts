@@ -27,6 +27,7 @@ import {
   saturation,
   screenUV,
   unpackRGBToNormal,
+  uniform,
   vec4,
   velocity,
 } from 'three/tsl'
@@ -36,7 +37,7 @@ import { ssgi, type default as SSGINode } from 'three/addons/tsl/display/SSGINod
 import { traa, type default as TRAANode } from 'three/addons/tsl/display/TRAANode.js'
 import { sharpen } from 'three/addons/tsl/display/SharpenNode.js'
 
-const AO_CONTRIBUTION = 0.27
+const AO_CONTRIBUTION = 0.771
 const SSR_CONTRIBUTION = 1.03
 const DIELECTRIC_BLUR = 2.15
 const DIELECTRIC_TEXTURE_BLEND = 0.5
@@ -47,6 +48,8 @@ const SHARPEN = 0.7
 
 export class PostProcessing {
   readonly pipeline: RenderPipeline
+  readonly aoPass: GTAONode
+  private readonly aoContribution = uniform(AO_CONTRIBUTION)
 
   constructor(
     renderer: WebGPURenderer,
@@ -101,22 +104,22 @@ export class PostProcessing {
     gBuffer.getTexture('diffuse').type = UnsignedByteType
     gBuffer.getTexture('metalRough').type = UnsignedByteType
 
-    const aoPass: GTAONode = ao(depth, normal, camera)
-    aoPass.radius.value = 1.51
-    aoPass.thickness.value = 0.107
-    aoPass.distanceExponent.value = 0.89
-    aoPass.distanceFallOff.value = 0.4
-    aoPass.scale.value = 0.14
-    aoPass.samples.value = 14
-    aoPass.resolutionScale = 0.6
-    aoPass.useTemporalFiltering = true
+    this.aoPass = ao(depth, normal, camera)
+    this.aoPass.radius.value = 3.525
+    this.aoPass.thickness.value = 0.137
+    this.aoPass.distanceExponent.value = 1.75
+    this.aoPass.distanceFallOff.value = 0.43
+    this.aoPass.scale.value = 0.34
+    this.aoPass.samples.value = 14
+    this.aoPass.resolutionScale = 0.6
+    this.aoPass.useTemporalFiltering = true
 
     const beautyPass = pass(scene, camera)
     beautyPass.contextNode = builtinAOContext(
       mix(
         1,
-        aoPass.getTextureNode().sample(screenUV).r,
-        AO_CONTRIBUTION,
+        this.aoPass.getTextureNode().sample(screenUV).r,
+        this.aoContribution,
       ),
     )
     beautyPass.needsUpdate = true
@@ -233,5 +236,13 @@ export class PostProcessing {
 
   render(): void {
     this.pipeline.render()
+  }
+
+  getAoContribution(): number {
+    return this.aoContribution.value
+  }
+
+  setAoContribution(value: number): void {
+    this.aoContribution.value = value
   }
 }
