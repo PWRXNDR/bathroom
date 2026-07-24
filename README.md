@@ -185,17 +185,7 @@ SSR и SSGI работают только с данными текущего э�
 
 `WebGPURenderer` запускается с `trackTimestamp: true`. Если адаптер поддерживает feature `timestamp-query`, WebGPU backend создаёт `GPUQuerySet` типа `timestamp`, записывает начало и конец render passes, выполняет `resolveQuerySet` в GPU buffer и после асинхронного readback переводит наносекунды в миллисекунды. В сцене результат отображается отдельной панелью `GPU MS`. Если feature недоступна, приложение продолжает работать без этой панели.
 
-Для воспроизводимого сравнения добавлен профильный режим. Он фиксирует render scale на 1.25, отключает adaptive quality, сохраняет ту же камеру, свет, ассеты и framebuffer размер 1920 × 1080 CSS pixels. Скрипт делает 12 timestamp samples для каждой конфигурации и сохраняет исходные значения в [`docs/gpu-profile-results.json`](docs/gpu-profile-results.json):
-
-```bash
-# В первом терминале
-npm run dev -- --host 127.0.0.1
-
-# Во втором терминале
-npm run profile:gpu
-```
-
-Замер выполнен 24 июля 2026 года в Chrome 150 на NVIDIA GeForce RTX 5060 Laptop GPU. Это GPU время всего активного render graph для кадра, а не изолированный synthetic benchmark одного shader:
+Замер выполнен в Chrome 150 на NVIDIA GeForce RTX 5060 Laptop GPU. Это GPU время всего активного render graph для кадра, а не изолированный synthetic benchmark одного shader:
 
 | Конфигурация | Среднее GPU время | Диапазон | Разница с full |
 | --- | ---: | ---: | ---: |
